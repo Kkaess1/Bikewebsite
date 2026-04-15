@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers — B-Rads Bikes</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>B-Rads Bikes</h1>
+    <a class="logout-btn" id="logout-btn">Sign Out</a>
+  </header>
+
+  <div class="container">
+    <div style="margin-bottom:16px;">
+      <a href="/" style="font-size:0.85rem;color:#555;text-decoration:none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <!-- Search + List -->
+    <div class="card" id="list-panel">
+      <h2>Customers</h2>
+      <div class="form-group">
+        <input type="text" id="search-input" placeholder="Search by name...">
+      </div>
+      <div id="customer-list"></div>
+    </div>
+
+    <!-- Customer Detail (hidden until selected) -->
+    <div id="detail-panel" style="display:none;">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;">
+          <h2 style="margin:0;border:none;padding:0;" id="detail-name"></h2>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="btn" id="delete-customer-btn" style="background:#fff0f0;color:#c00;border:1px solid #fbb;">Delete Customer</button>
+            <button class="btn btn-secondary" id="close-detail-btn">Close</button>
+          </div>
+        </div>
+
+        <!-- Contact info (view + edit) -->
+        <div id="contact-view">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Phone</div>
+              <div id="detail-phone" style="font-size:0.95rem;"></div>
+            </div>
+            <div>
+              <div style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Email</div>
+              <div id="detail-email" style="font-size:0.95rem;"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <div style="font-size:0.78rem;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;">Carrier</div>
+            <div id="detail-carrier" style="font-size:0.95rem;"></div>
+          </div>
+          <button class="btn btn-secondary" id="edit-contact-btn" style="font-size:0.82rem;padding:6px 14px;margin-top:12px;">Edit Contact Info</button>
+        </div>
+
+        <!-- Edit form (hidden) -->
+        <div id="contact-edit" style="display:none;padding:12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:6px;margin-top:8px;">
+          <div class="form-group">
+            <label for="edit-name">Name</label>
+            <input type="text" id="edit-name">
+          </div>
+          <div class="form-group">
+            <label for="edit-phone">Phone</label>
+            <input type="text" id="edit-phone">
+          </div>
+          <div class="form-group">
+            <label for="edit-email">Email</label>
+            <input type="text" id="edit-email">
+          </div>
+          <div class="form-group">
+            <label for="edit-carrier">Mobile Carrier</label>
+            <select id="edit-carrier">
+              <option value="">Unknown / Skip texts</option>
+              <option value="att">AT&amp;T</option>
+              <option value="verizon">Verizon</option>
+              <option value="tmobile">T-Mobile</option>
+              <option value="boost">Boost Mobile</option>
+              <option value="cricket">Cricket</option>
+              <option value="metro">Metro by T-Mobile</option>
+              <option value="uscellular">US Cellular</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" id="save-contact-btn" type="button">Save</button>
+            <button class="btn btn-secondary" id="cancel-edit-btn" type="button">Cancel</button>
+          </div>
+          <div id="edit-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="card">
+        <h2>History Summary</h2>
+        <div class="totals-grid" id="customer-summary"></div>
+      </div>
+
+      <!-- Job History -->
+      <div class="card">
+        <h2>Jobs</h2>
+        <div id="job-history"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal -->
+  <div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:none;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;padding:28px 24px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <h3 style="margin:0 0 10px;font-size:1.1rem;color:#c00;">Delete Customer?</h3>
+      <p style="font-size:0.9rem;color:#444;margin:0 0 6px;">You are about to permanently delete:</p>
+      <p style="font-weight:700;font-size:1rem;margin:0 0 12px;" id="modal-customer-name"></p>
+      <p style="font-size:0.88rem;color:#888;margin:0 0 20px;">This will also delete all jobs, parts, and labor records for this customer. <strong>This cannot be undone.</strong></p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn" id="confirm-delete-btn" style="background:#c00;color:#fff;flex:1;">Yes, Delete Everything</button>
+        <button class="btn btn-secondary" id="cancel-delete-btn" style="flex:1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="/js/customers.js"></script>
+</body>
+</html>

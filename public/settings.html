@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - B-Rads Bikes</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>B-Rads Bikes</h1>
+    <a class="logout-btn" id="logout-btn">Sign Out</a>
+  </header>
+
+  <div class="container">
+    <div style="margin-bottom:16px;">
+      <a href="/" style="font-size:0.85rem;color:#555;text-decoration:none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card">
+      <h2>Change Password</h2>
+      <div id="pw-success" class="msg"></div>
+      <div id="pw-error" class="msg"></div>
+      <div class="form-group">
+        <label for="current-password">Current Password</label>
+        <input type="password" id="current-password" placeholder="Enter current password">
+      </div>
+      <div class="form-group">
+        <label for="new-password">New Password</label>
+        <input type="password" id="new-password" placeholder="Enter new password">
+      </div>
+      <div class="form-group">
+        <label for="confirm-password">Confirm New Password</label>
+        <input type="password" id="confirm-password" placeholder="Re-enter new password">
+      </div>
+      <button class="btn btn-primary" id="save-password-btn">Update Password</button>
+    </div>
+
+    <!-- Gmail SMS Setup -->
+    <div class="card">
+      <h2>Text Message Notifications</h2>
+      <p style="font-size:0.88rem;color:#555;margin-bottom:16px;line-height:1.5;">
+        Text messages are sent for free through your Gmail account using carrier gateways.
+        No monthly fees or SMS credits needed.
+      </p>
+
+      <div id="gmail-status" style="margin-bottom:14px;"></div>
+      <div id="gmail-success" class="msg"></div>
+      <div id="gmail-error" class="msg"></div>
+
+      <div class="form-group">
+        <label for="gmail-user">Gmail Address</label>
+        <input type="text" id="gmail-user" placeholder="e.g. bradsbikes.notify@gmail.com">
+        <div style="font-size:0.78rem;color:#888;margin-top:4px;">
+          Create a free Gmail account just for the shop - keep it separate from your personal email.
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="gmail-app-password">Gmail App Password</label>
+        <div style="position:relative;">
+          <input type="password" id="gmail-app-password" placeholder="xxxx xxxx xxxx xxxx" style="padding-right:70px;">
+          <button type="button" id="toggle-app-pw" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:0.78rem;color:#1a5fa8;cursor:pointer;">Show</button>
+        </div>
+        <div style="font-size:0.78rem;color:#888;margin-top:4px;line-height:1.5;">
+          Not your regular Gmail password. To get one:
+          Go to <strong>Google Account -> Security -> 2-Step Verification -> App Passwords</strong>.
+          Create one named "B-Rads Bikes" and paste it here.
+        </div>
+      </div>
+      <button class="btn btn-primary" id="save-gmail-btn">Save Gmail Settings</button>
+
+      <!-- Test SMS -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e8e8e8;">
+        <div style="font-weight:600;font-size:0.88rem;margin-bottom:10px;">Send a Test Text</div>
+        <div id="test-success" class="msg"></div>
+        <div id="test-error" class="msg"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div class="form-group" style="margin:0;">
+            <label for="test-phone">Phone Number</label>
+            <input type="text" id="test-phone" placeholder="5558675309">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label for="test-carrier">Carrier</label>
+            <select id="test-carrier">
+              <option value="">Select carrier</option>
+              <option value="att">AT&amp;T</option>
+              <option value="verizon">Verizon</option>
+              <option value="tmobile">T-Mobile</option>
+              <option value="boost">Boost Mobile</option>
+              <option value="cricket">Cricket</option>
+              <option value="metro">Metro by T-Mobile</option>
+              <option value="uscellular">US Cellular</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-secondary" id="test-sms-btn">Send Test Text</button>
+      </div>
+    </div>
+    <!-- Shop Contact (for follow-up reminder texts to owner) -->
+    <div class="card">
+      <h2>Shop Contact</h2>
+      <p style="font-size:0.88rem;color:#555;margin-bottom:16px;line-height:1.5;">
+        Your phone number and carrier so you receive automated follow-up reminder texts when a customer is notified.
+      </p>
+      <div id="shop-success" class="msg"></div>
+      <div id="shop-error" class="msg"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <div class="form-group" style="margin:0;">
+          <label for="shop-phone">Shop Phone Number</label>
+          <input type="text" id="shop-phone" placeholder="5558675309">
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label for="shop-carrier">Shop Carrier</label>
+          <select id="shop-carrier">
+            <option value="">Select carrier</option>
+            <option value="att">AT&amp;T</option>
+            <option value="verizon">Verizon</option>
+            <option value="tmobile">T-Mobile</option>
+            <option value="boost">Boost Mobile</option>
+            <option value="cricket">Cricket</option>
+            <option value="metro">Metro by T-Mobile</option>
+            <option value="uscellular">US Cellular</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="save-shop-btn">Save Shop Contact</button>
+    </div>
+  </div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="/js/settings.js"></script>
+</body>
+</html>

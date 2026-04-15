@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reports - B-Rads Bikes</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    #print-header { display: none; }
+    @media print {
+      header, .filter-bar, .custom-range, .quarterly-select, #error-msg,
+      #filter-card, #chart-card, #back-link, #print-btn { display: none !important; }
+      #print-header { display: block; margin-bottom: 24px; }
+      #print-header h1 { font-size: 1.4rem; margin: 0 0 4px; }
+      #print-header p { margin: 2px 0; font-size: 0.9rem; color: #444; }
+      .card { box-shadow: none; border: 1px solid #ccc; }
+      .totals-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>B-Rads Bikes</h1>
+    <a class="logout-btn" id="logout-btn">Sign Out</a>
+  </header>
+
+  <div class="container">
+    <div id="print-header">
+      <h1>B-Rads Bikes - Financial Report</h1>
+      <p id="print-period"></p>
+      <p id="print-generated"></p>
+    </div>
+
+    <div id="back-link" style="margin-bottom:16px;">
+      <a href="/" style="font-size:0.85rem;color:#555;text-decoration:none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="card" id="filter-card">
+      <h2>Generate Report</h2>
+      <div class="filter-bar">
+        <button class="filter-btn" data-preset="week">This Week</button>
+        <button class="filter-btn" data-preset="month">This Month</button>
+        <button class="filter-btn" data-preset="quarter">This Quarter</button>
+        <button class="filter-btn" data-preset="quarterly">By Quarter</button>
+        <button class="filter-btn" data-preset="year">This Year</button>
+        <button class="filter-btn" data-preset="custom">Custom Range</button>
+      </div>
+      <div class="quarterly-select custom-range" id="quarterly-select">
+        <button class="filter-btn" data-q="1">Q1 (Jan-Mar)</button>
+        <button class="filter-btn" data-q="2">Q2 (Apr-Jun)</button>
+        <button class="filter-btn" data-q="3">Q3 (Jul-Sep)</button>
+        <button class="filter-btn" data-q="4">Q4 (Oct-Dec)</button>
+      </div>
+      <div class="custom-range" id="custom-range">
+        <label>From</label>
+        <input type="date" id="from-date">
+        <label>To</label>
+        <input type="date" id="to-date">
+        <button class="btn btn-secondary" id="custom-apply-btn">Apply</button>
+      </div>
+    </div>
+
+    <div id="error-msg" class="msg"></div>
+
+    <!-- Summary -->
+    <div class="card" id="summary-card" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <h2 style="margin:0;border:none;padding:0;">Summary</h2>
+        <button id="print-btn" class="btn btn-secondary" onclick="printReport()">Print Report</button>
+      </div>
+      <div class="totals-grid" id="summary-grid"></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card" id="chart-card" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+        <h2 style="margin:0;border:none;padding:0;">Trends</h2>
+        <div class="filter-bar" style="margin:0;">
+          <button class="chart-toggle active" data-metric="revenue">Revenue</button>
+          <button class="chart-toggle active" data-metric="expenses">Expenses</button>
+          <button class="chart-toggle active" data-metric="profit">Profit</button>
+          <button class="chart-toggle active" data-metric="jobs">Job Count</button>
+        </div>
+      </div>
+      <div style="position:relative;height:280px;">
+        <canvas id="report-chart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="/js/report.js"></script>
+</body>
+</html>

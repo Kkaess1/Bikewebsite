@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start a Job — B-Rads Bikes</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>B-Rads Bikes</h1>
+    <a class="logout-btn" id="logout-btn">Sign Out</a>
+  </header>
+
+  <div class="container">
+    <div style="margin-bottom:16px;">
+      <a href="/" style="font-size:0.85rem;color:#555;text-decoration:none;">&larr; Back to Dashboard</a>
+    </div>
+
+    <div id="error-msg" class="msg"></div>
+    <div id="success-msg" class="msg"></div>
+
+    <!-- Step 1: Customer -->
+    <div class="card">
+      <h2><span class="step-badge">1</span> Customer</h2>
+      <div class="form-group">
+        <label for="customer-input">Who is this job for?</label>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div class="customer-wrap" style="flex:1;">
+            <input type="text" id="customer-input" autocomplete="off" placeholder="Type a name to search...">
+            <ul class="customer-dropdown" id="customer-dropdown"></ul>
+          </div>
+          <button class="btn btn-secondary" id="add-customer-btn" type="button">+ New</button>
+          <button class="btn btn-secondary" id="edit-customer-btn" type="button" style="display:none;">Edit</button>
+        </div>
+        <input type="hidden" id="customer-id">
+        <div id="customer-selected" style="margin-top:6px;font-size:0.88rem;color:#1a7a1a;font-weight:600;"></div>
+      </div>
+
+      <!-- Add new customer form -->
+      <div id="new-customer-form" style="display:none;margin-top:4px;padding:14px;background:#EDF0F5;border:1px solid #C8D0DC;border-radius:6px;">
+        <div style="font-weight:700;color:#002244;margin-bottom:10px;">New Customer</div>
+        <div class="form-group">
+          <label for="new-customer-name">Full Name <span style="color:#FA4616;">*</span></label>
+          <input type="text" id="new-customer-name" placeholder="e.g. John Smith">
+        </div>
+        <div class="form-group">
+          <label for="new-customer-phone">Phone Number</label>
+          <input type="text" id="new-customer-phone" placeholder="e.g. 555-867-5309">
+        </div>
+        <div class="form-group">
+          <label for="new-customer-email">Email Address</label>
+          <input type="text" id="new-customer-email" placeholder="e.g. john@email.com">
+        </div>
+        <div class="form-group">
+          <label for="new-customer-carrier">Mobile Carrier (for texts)</label>
+          <select id="new-customer-carrier">
+            <option value="">Unknown / Skip texts</option>
+            <option value="att">AT&amp;T</option>
+            <option value="verizon">Verizon</option>
+            <option value="tmobile">T-Mobile</option>
+            <option value="boost">Boost Mobile</option>
+            <option value="cricket">Cricket</option>
+            <option value="metro">Metro by T-Mobile</option>
+            <option value="uscellular">US Cellular</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" id="confirm-new-customer-btn" type="button">Save Customer</button>
+          <button class="btn btn-secondary" id="cancel-new-customer-btn" type="button">Cancel</button>
+        </div>
+        <div id="new-customer-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
+      </div>
+
+      <!-- Edit existing customer form -->
+      <div id="edit-customer-form" style="display:none;margin-top:4px;padding:14px;background:#EDF0F5;border:1px solid #C8D0DC;border-radius:6px;">
+        <div style="font-weight:700;color:#002244;margin-bottom:10px;">Edit Customer</div>
+        <div class="form-group">
+          <label for="ec-name">Full Name <span style="color:#FA4616;">*</span></label>
+          <input type="text" id="ec-name">
+        </div>
+        <div class="form-group">
+          <label for="ec-phone">Phone Number</label>
+          <input type="text" id="ec-phone">
+        </div>
+        <div class="form-group">
+          <label for="ec-email">Email Address</label>
+          <input type="text" id="ec-email">
+        </div>
+        <div class="form-group">
+          <label for="ec-carrier">Mobile Carrier</label>
+          <select id="ec-carrier">
+            <option value="">Unknown / Skip texts</option>
+            <option value="att">AT&amp;T</option>
+            <option value="verizon">Verizon</option>
+            <option value="tmobile">T-Mobile</option>
+            <option value="boost">Boost Mobile</option>
+            <option value="cricket">Cricket</option>
+            <option value="metro">Metro by T-Mobile</option>
+            <option value="uscellular">US Cellular</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" id="confirm-edit-customer-btn" type="button">Save Changes</button>
+          <button class="btn btn-secondary" id="cancel-edit-customer-btn" type="button">Cancel</button>
+        </div>
+        <div id="edit-customer-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
+      </div>
+
+      <!-- Estimated Completion Date — always visible -->
+      <div class="completion-row" style="margin-top:16px;">
+        <div class="completion-content">
+          <div class="completion-label">Est. Completion</div>
+          <input type="date" id="estimated-completion" class="completion-date-input" onclick="try{this.showPicker()}catch(e){}">
+        </div>
+      </div>
+
+      <!-- Notes — "Add a note" expandable -->
+      <div class="note-field" style="margin-top:12px;">
+        <button class="add-note-trigger" id="add-note-trigger" type="button">
+          Add a note&hellip;
+        </button>
+        <div class="note-expand" id="note-expand">
+          <textarea id="job-notes" class="note-textarea" placeholder="Describe the job, special instructions, customer requests..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Parts Used (Expenses) -->
+    <div class="card">
+      <h2><span class="step-badge">2</span> Parts Used</h2>
+      <p class="card-hint">Parts &amp; materials the shop is spending money on — not billed directly to the customer.</p>
+
+      <div class="line-items" id="parts-list"></div>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button class="btn btn-add" id="add-part-row-btn">+ Add Part</button>
+        <button class="btn btn-add" id="add-part-catalog-btn" style="border-color:#FA4616;color:#FA4616;">+ Add to Catalog</button>
+      </div>
+
+      <!-- Inline Add Part to Catalog -->
+      <div id="new-part-catalog-form" style="display:none;margin-top:16px;padding:14px;background:#EDF0F5;border:1px solid #C8D0DC;border-radius:6px;">
+        <div style="font-weight:700;color:#002244;margin-bottom:10px;">Add New Part to Catalog</div>
+        <div class="form-group">
+          <label for="np-name">Part Name <span style="color:#FA4616;">*</span></label>
+          <input type="text" id="np-name" placeholder="e.g. Chain Wax">
+        </div>
+        <div class="form-group">
+          <label for="np-note">Note / Description (optional)</label>
+          <textarea id="np-note" placeholder="e.g. Park Tool brand, used for chain lubrication" style="min-height:50px;"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Follow-Up Reminder (optional)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" inputmode="numeric" id="np-followup-value" placeholder="e.g. 2" style="width:90px;">
+            <select id="np-followup-unit" style="width:auto;">
+              <option value="">No reminder</option>
+              <option value="days">Days</option>
+              <option value="weeks">Weeks</option>
+              <option value="months">Months</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" id="save-new-part-btn" type="button">Save to Catalog</button>
+          <button class="btn btn-secondary" id="cancel-new-part-btn" type="button">Cancel</button>
+        </div>
+        <div id="new-part-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Step 3: Services Charged -->
+    <div class="card">
+      <h2><span class="step-badge">3</span> Services Charged</h2>
+      <p class="card-hint">What the customer is paying for — labor, tune-ups, repairs, etc.</p>
+
+      <!-- Bike Type — always visible -->
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>Bike Type <span style="font-weight:400;color:#6B7A8D;">(optional)</span></label>
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <div class="customer-wrap" style="flex:1;">
+            <input type="text" id="bike-input" autocomplete="off" placeholder="Search or select bike...">
+            <ul class="customer-dropdown" id="bike-dropdown"></ul>
+          </div>
+          <button class="btn btn-secondary" id="add-bike-inline-btn" type="button">+ Add Bike</button>
+        </div>
+        <input type="hidden" id="bike-id">
+        <div id="bike-selected" style="margin-top:4px;font-size:0.85rem;color:#1a7a1a;font-weight:600;"></div>
+
+        <!-- Inline Add Bike -->
+        <div id="new-bike-form" style="display:none;margin-top:10px;padding:14px;background:#EDF0F5;border:1px solid #C8D0DC;border-radius:6px;">
+          <div style="font-weight:700;color:#002244;margin-bottom:10px;">Add New Bike to Catalog</div>
+          <div class="form-group">
+            <label for="nb-name">Bike Name / Model <span style="color:#FA4616;">*</span></label>
+            <input type="text" id="nb-name" placeholder="e.g. Trek FX3">
+          </div>
+          <div class="form-group">
+            <label for="nb-description">Description (optional)</label>
+            <textarea id="nb-description" placeholder="e.g. Hybrid commuter, size M" style="min-height:50px;"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" id="save-new-bike-btn" type="button">Save to Catalog</button>
+            <button class="btn btn-secondary" id="cancel-new-bike-btn" type="button">Cancel</button>
+          </div>
+          <div id="new-bike-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Services list -->
+      <div class="section-title">Services</div>
+      <div class="line-items" id="services-list"></div>
+      <button class="btn btn-add" id="add-service-btn">+ Add Service</button>
+    </div>
+
+    <!-- Totals -->
+    <div class="card">
+      <h2>Totals</h2>
+      <div class="totals-grid" style="margin-bottom:12px;">
+        <div class="total-box" style="grid-column:1/-1;">
+          <label>Total Expenses (Parts)</label>
+          <div class="amount" id="total-expenses">$0.00</div>
+        </div>
+      </div>
+      <div class="totals-grid" style="margin-bottom:12px;">
+        <div class="total-box">
+          <label>Services Total</label>
+          <div class="amount" id="services-total">$0.00</div>
+        </div>
+        <div class="total-box highlight">
+          <label>Customer Cost</label>
+          <div class="amount" id="customer-cost-display">$0.00</div>
+        </div>
+      </div>
+      <div class="totals-grid">
+        <div class="total-box" id="profit-box" style="grid-column:1/-1;">
+          <label>Profit</label>
+          <div class="amount" id="profit-amount">$0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="card">
+      <h2>Notifications</h2>
+      <label class="checkbox-label" style="margin-bottom:12px;">
+        <input type="checkbox" id="send-notification">
+        <span>Send customer a text that their job has started</span>
+      </label>
+      <div id="sms-note" style="font-size:0.82rem;color:#6B7A8D;">
+        Services will be listed in the text. An invoice will also be emailed automatically.
+      </div>
+      <div id="sms-warning" style="display:none;margin-top:6px;font-size:0.82rem;color:#b86000;"></div>
+
+      <!-- Follow-up reminder opt-in -->
+      <div id="reminder-section" style="display:none;margin-top:16px;padding-top:14px;border-top:1px solid #E8EBF0;">
+        <label class="checkbox-label">
+          <input type="checkbox" id="send-reminders">
+          <span>Send automated follow-up reminder texts</span>
+        </label>
+        <div id="reminder-details" style="margin-top:8px;font-size:0.82rem;color:#6B7A8D;line-height:1.6;"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" id="save-btn" style="margin-bottom:40px;">Save Job</button>
+  </div>
+
+  <script src="/js/auth-guard.js"></script>
+  <script src="/js/job.js"></script>
+</body>
+</html>

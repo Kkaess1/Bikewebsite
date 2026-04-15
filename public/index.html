@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B-Rads Bikes</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header>
+    <h1>B-Rads Bikes</h1>
+    <a class="logout-btn" id="logout-btn">Sign Out</a>
+  </header>
+
+  <div class="container">
+    <div class="dashboard-grid">
+      <a class="dash-btn" href="/job.html">
+        <span class="icon">&#128295;</span>
+        Start a Job
+      </a>
+      <a class="dash-btn" href="/report.html">
+        <span class="icon">&#128202;</span>
+        Generate Report
+      </a>
+      <a class="dash-btn" href="/customers.html">
+        <span class="icon">&#128101;</span>
+        Customers
+      </a>
+      <a class="dash-btn" href="/parts.html">
+        <span class="icon">&#128297;</span>
+        Parts &amp; Bikes
+      </a>
+      <a class="dash-btn" href="/settings.html" style="grid-column: 1 / -1; padding: 20px;">
+        <span class="icon" style="font-size:1.4rem;">&#9881;</span>
+        Settings
+      </a>
+    </div>
+    <div style="text-align:center;margin-top:18px;">
+      <a href="/job.html?past=true" style="font-size:0.82rem;color:#6B7A8D;text-decoration:none;border:1px solid #C8D0DC;border-radius:5px;padding:5px 14px;display:inline-block;">+ Log Past Job</a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.href = '/login';
+    });
+  </script>
+  <script src="/js/auth-guard.js"></script>
+</body>
+</html>
