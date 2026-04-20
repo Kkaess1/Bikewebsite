@@ -52,14 +52,7 @@ async function initDb() {
     )
   `);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS job_labor (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
-      description TEXT NOT NULL,
-      cost        REAL NOT NULL DEFAULT 0
-    )
-  `);
+  db.run(`DROP TABLE IF EXISTS job_labor`);
 
   db.run(`
     CREATE TABLE IF NOT EXISTS job_other (

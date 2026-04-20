@@ -96,24 +96,32 @@ function renderDetail(customer) {
   document.getElementById('contact-edit').style.display = 'none';
   document.getElementById('contact-view').style.display = '';
 
-  // Summary
+  // Summary (collapsible, closed by default)
   const s = customer.summary;
-  document.getElementById('customer-summary').innerHTML = `
-    <div class="total-box">
-      <label>Total Jobs</label>
-      <div class="amount">${s.job_count}</div>
-    </div>
-    <div class="total-box">
-      <label>Total Expenses</label>
-      <div class="amount">$${s.total_expenses.toFixed(2)}</div>
-    </div>
-    <div class="total-box highlight">
-      <label>Total Revenue</label>
-      <div class="amount">$${s.total_revenue.toFixed(2)}</div>
-    </div>
-    <div class="total-box ${s.total_profit >= 0 ? 'profit-positive' : 'profit-negative'}">
-      <label>Total Profit</label>
-      <div class="amount">$${s.total_profit.toFixed(2)}</div>
+  const summaryEl = document.getElementById('customer-summary');
+  summaryEl.classList.remove('open');
+  const toggleEl = document.getElementById('summary-toggle');
+  toggleEl.classList.remove('open');
+  summaryEl.innerHTML = `
+    <div style="padding-top:14px;">
+      <div class="totals-grid">
+        <div class="total-box">
+          <label>Total Jobs</label>
+          <div class="amount">${s.job_count}</div>
+        </div>
+        <div class="total-box">
+          <label>Total Expenses</label>
+          <div class="amount">$${s.total_expenses.toFixed(2)}</div>
+        </div>
+        <div class="total-box highlight">
+          <label>Total Revenue</label>
+          <div class="amount">$${s.total_revenue.toFixed(2)}</div>
+        </div>
+        <div class="total-box ${s.total_profit >= 0 ? 'profit-positive' : 'profit-negative'}">
+          <label>Total Profit</label>
+          <div class="amount">$${s.total_profit.toFixed(2)}</div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -134,19 +142,28 @@ function renderDetail(customer) {
       || (job.services || []).length || (job.charge_other || []).length || job.notes;
     const profitClass = job.profit >= 0 ? 'profit-pos' : 'profit-neg';
 
+    const amountsId = `ja-${i}`;
     return `
       <div class="job-history-row">
         <div class="job-history-header">
           <span class="job-history-date">${job.date}</span>
           ${job.bike_name ? `<span style="font-size:0.82rem;color:#6B7A8D;">${escapeHtml(job.bike_name)}</span>` : ''}
+          <span style="margin-left:auto;display:flex;gap:10px;align-items:center;">
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="window.location.href='/job.html?edit=${job.id}'">Edit</button>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="printInvoice(${job.id})">Print</button>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="resendInvoice(${job.id}, this)">Resend</button>
+            <span class="detail-toggle" onclick="toggleAmounts('${amountsId}')">&#9660; amounts</span>
+            ${hasDetail ? `<span class="detail-toggle" onclick="toggleJobDetail('${detailId}')">&#9660; details</span>` : ''}
+          </span>
+        </div>
+        <div class="job-detail" id="${amountsId}">
           <span class="job-history-amounts">
             Charged: <strong>$${job.customer_cost.toFixed(2)}</strong>
             &nbsp;&nbsp;Profit: <strong class="${profitClass}">$${job.profit.toFixed(2)}</strong>
           </span>
-          ${hasDetail ? `<span class="detail-toggle" onclick="toggleJobDetail('${detailId}')">&#9660; details</span>` : ''}
         </div>
         ${job.notes ? `<div style="font-size:0.82rem;color:#555;margin-top:2px;">${escapeHtml(job.notes)}</div>` : ''}
-        ${job.estimated_completion ? `<div style="font-size:0.82rem;color:#555;">Est. completion: ${escapeHtml(job.estimated_completion)}</div>` : ''}
+        ${job.estimated_completion ? `<div style="font-size:0.82rem;color:#555;">Completion Date: ${escapeHtml(job.estimated_completion)}</div>` : ''}
         <div class="job-detail" id="${detailId}">
           ${(job.services || []).length ? `<strong style="font-size:0.78rem;">Services</strong><ul>${servicesHtml}</ul>` : ''}
           ${(job.charge_other || []).length ? `<strong style="font-size:0.78rem;">Other Charges</strong><ul>${chargeOtherHtml}</ul>` : ''}
@@ -162,6 +179,19 @@ function toggleJobDetail(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
 }
+
+function toggleAmounts(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// ─── Summary Toggle ───────────────────────────────────────────────────────────
+document.getElementById('summary-toggle').addEventListener('click', () => {
+  const body = document.getElementById('customer-summary');
+  const toggle = document.getElementById('summary-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+});
 
 // ─── Edit Contact Info ────────────────────────────────────────────────────────
 document.getElementById('edit-contact-btn').addEventListener('click', () => {
@@ -263,6 +293,33 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
     btn.textContent = 'Yes, Delete Everything';
   }
 });
+
+// ─── Invoice Actions ──────────────────────────────────────────────────────────
+function printInvoice(jobId) {
+  window.open(`/api/jobs/${jobId}/invoice`, '_blank');
+}
+
+async function resendInvoice(jobId, btn) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '...';
+  try {
+    const res = await fetch(`/api/jobs/${jobId}/resend-invoice`, { method: 'POST' });
+    const data = await res.json();
+    if (data.sent) {
+      btn.textContent = 'Sent!';
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+    } else {
+      alert(`Could not send: ${data.reason || data.error || 'Unknown error'}`);
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  } catch {
+    alert('Connection error.');
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadCustomers();

@@ -1,7 +1,7 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const requireAuth = require('../middleware/requireAuth');
-const { createJob, getCustomerById, getBikeById, createReminder, getSetting } = require('../db/queries');
+const { createJob, getJobById, updateJob, getCustomerById, getBikeById, createReminder, getSetting } = require('../db/queries');
 const router = express.Router();
 
 router.use(requireAuth);
@@ -77,14 +77,10 @@ async function sendJobStartSms(customer, estimatedCompletion, customerCost, serv
 }
 
 
-// ─── Send invoice email ───────────────────────────────────────────────────────
-async function sendInvoiceEmail(customer, { services, parts, charge_other, customer_cost, estimated_completion, notes, bike_name }) {
-  if (!customer.email) return { skipped: true, reason: 'No email on file' };
-  const t = makeTransporter();
-  if (!t) return { skipped: true, reason: 'Gmail not configured' };
-
-  const today = new Date();
-  const dateFormatted = `${today.getMonth() + 1}/${today.getDate()}/${String(today.getFullYear()).slice(-2)}`;
+// ─── Build invoice HTML (shared by email + print) ────────────────────────────
+function buildInvoiceHtml(customer, { services, charge_other, customer_cost, estimated_completion, notes, bike_name, job_date }, { forPrint = false } = {}) {
+  const d = job_date ? new Date(job_date + 'T12:00:00') : new Date();
+  const dateFormatted = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
 
   const completionFormatted = estimated_completion
     ? new Date(estimated_completion + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
@@ -92,25 +88,34 @@ async function sendInvoiceEmail(customer, { services, parts, charge_other, custo
 
   const border = '1px solid #000';
   const cellStyle = `padding:6px 10px;border-bottom:${border};`;
+  // Parts (shop expenses) are intentionally excluded from the customer-facing invoice
   const allItems = [
-    ...(services || []).filter(s => s.description?.trim()).map(s => ({ desc: s.description, price: s.price })),
-    ...(parts   || []).filter(p => p.description?.trim()).map(p => ({ desc: p.description, price: p.price })),
+    ...(services     || []).filter(s => s.description?.trim()).map(s => ({ desc: s.description, price: s.price })),
     ...(charge_other || []).filter(o => o.description?.trim()).map(o => ({ desc: o.description, price: o.price })),
   ];
   const allItemsHtml = allItems.map(item =>
     `<tr><td style="${cellStyle}">${escapeHtml(item.desc)}</td><td style="${cellStyle}width:90px;">$${Number(item.price).toFixed(2)}</td></tr>`
   ).join('');
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+  const printBtn = forPrint ? `
+  <div style="text-align:center;margin-bottom:20px;">
+    <button onclick="window.print()" style="padding:10px 28px;background:#002244;color:#fff;border:none;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;">Print</button>
+  </div>` : '';
+
+  const printStyle = forPrint ? `<style>@media print { button { display:none !important; } }</style>` : '';
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">${printStyle}</head>
 <body style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto;padding:20px;color:#333;background:#fff;">
 
-  <h1 style="text-align:center;font-size:2rem;font-weight:bold;margin:0 0 4px;">Information Sheet</h1>
+  ${printBtn}
+
+  <h1 style="text-align:center;font-size:2rem;font-weight:bold;margin:0 0 4px;">Invoice</h1>
   <p style="text-align:center;font-weight:bold;margin:0 0 16px;">B-Rad and ride a bike</p>
 
   <table style="width:100%;border-collapse:collapse;border:${border};">
     <tr>
       <td style="padding:6px 10px;border-right:${border};width:70%;"></td>
-      <td style="padding:6px 10px;"><strong>Date: ${dateFormatted}</strong></td>
+      <td style="padding:6px 10px;"><strong>Date Created: ${dateFormatted}</strong></td>
     </tr>
   </table>
 
@@ -129,7 +134,7 @@ async function sendInvoiceEmail(customer, { services, parts, charge_other, custo
     </tr>
     <tr>
       <td style="padding:6px 10px;border-right:${border};">Email</td>
-      <td colspan="2" style="padding:6px 10px;">${customer.email}</td>
+      <td colspan="2" style="padding:6px 10px;">${customer.email || ''}</td>
     </tr>
   </table>
 
@@ -147,7 +152,7 @@ async function sendInvoiceEmail(customer, { services, parts, charge_other, custo
   ${completionFormatted ? `
   <table style="width:100%;border-collapse:collapse;border:${border};border-top:none;">
     <tr>
-      <td style="padding:8px 10px;">Estimated Completion: <strong>${completionFormatted}</strong></td>
+      <td style="padding:8px 10px;">Completion Date: <strong>${completionFormatted}</strong></td>
     </tr>
   </table>` : ''}
 
@@ -163,7 +168,14 @@ async function sendInvoiceEmail(customer, { services, parts, charge_other, custo
 
   <p style="text-align:center;font-style:italic;margin-top:24px;">&ldquo;I treat your bike like it&rsquo;s mine until you come pick it up&rdquo;</p>
 </body></html>`;
+}
 
+// ─── Send invoice email ───────────────────────────────────────────────────────
+async function sendInvoiceEmail(customer, jobData) {
+  if (!customer.email) return { skipped: true, reason: 'No email on file' };
+  const t = makeTransporter();
+  if (!t) return { skipped: true, reason: 'Gmail not configured' };
+  const html = buildInvoiceHtml(customer, jobData);
   try {
     await t.transporter.sendMail({ from: t.from, to: customer.email, subject: 'B-Rads Bikes — Service Invoice', html });
     return { sent: true };
@@ -221,7 +233,7 @@ router.post('/', async (req, res) => {
           customer_id: parseInt(customer_id),
           part_name: r.part_name,
           send_at: sendAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ''),
-          cust_message: `Hi ${customer.name}, this is a reminder from B-Rads Bikes! It's time for your ${r.part_name} service. Give us a call to schedule your appointment. Text ${shopContact}.`,
+          cust_message: `Hi ${customer.name}, This is a reminder from B-Rad's Bikes! It might be time for your ${r.part_name} service. Contact me if you'd like to schedule a service. (714) 235-5959\nPlease do not reply to this message.`,
           shop_message: `B-Rads Bikes reminder: ${customer.name} (${customer.phone || 'no phone'}) has been notified that it's time for their ${r.part_name} service.`,
         });
       }
@@ -231,7 +243,7 @@ router.post('/', async (req, res) => {
     let invoiceResult = null;
     if (customer && !is_past_job) {
       try {
-        invoiceResult = await sendInvoiceEmail(customer, { services, parts, charge_other, customer_cost, estimated_completion, notes, bike_name: bike?.name || null });
+        invoiceResult = await sendInvoiceEmail(customer, { services, parts, charge_other, customer_cost, estimated_completion, notes, bike_name: bike?.name || null, job_date: undefined });
       } catch (err) {
         console.error('Invoice error:', err.message);
         invoiceResult = { skipped: true, reason: err.message };
@@ -253,6 +265,85 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to save job' });
+  }
+});
+
+// ─── GET /api/jobs/:id/invoice — printable invoice page ──────────────────────
+router.get('/:id/invoice', (req, res) => {
+  try {
+    const job = getJobById(parseInt(req.params.id));
+    if (!job) return res.status(404).send('Job not found');
+    const customer = getCustomerById(job.customer_id);
+    if (!customer) return res.status(404).send('Customer not found');
+    const html = buildInvoiceHtml(customer, {
+      services: job.services,
+      charge_other: job.charge_other,
+      customer_cost: job.customer_cost,
+      estimated_completion: job.estimated_completion,
+      notes: job.notes,
+      bike_name: job.bike_name,
+      job_date: job.date,
+    }, { forPrint: true });
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Failed to generate invoice');
+  }
+});
+
+// ─── POST /api/jobs/:id/resend-invoice — resend invoice email ─────────────────
+router.post('/:id/resend-invoice', async (req, res) => {
+  try {
+    const job = getJobById(parseInt(req.params.id));
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    const customer = getCustomerById(job.customer_id);
+    if (!customer) return res.status(404).json({ error: 'Customer not found' });
+    const result = await sendInvoiceEmail(customer, {
+      services: job.services,
+      charge_other: job.charge_other,
+      customer_cost: job.customer_cost,
+      estimated_completion: job.estimated_completion,
+      notes: job.notes,
+      bike_name: job.bike_name,
+      job_date: job.date,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to resend invoice' });
+  }
+});
+
+// ─── GET /api/jobs/:id/data — fetch job for editing ──────────────────────────
+router.get('/:id/data', (req, res) => {
+  try {
+    const job = getJobById(parseInt(req.params.id));
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json(job);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch job' });
+  }
+});
+
+// ─── PUT /api/jobs/:id — update existing job ─────────────────────────────────
+router.put('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { customer_id, notes, estimated_completion, parts, other, services, charge_other, bike_id } = req.body;
+
+    if (!customer_id) return res.status(400).json({ error: 'Customer is required' });
+
+    const services_total     = (services || []).reduce((s, sv) => s + (parseFloat(sv.price) || 0), 0);
+    const charge_other_total = (charge_other || []).reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
+    const customer_cost = services_total + charge_other_total;
+
+    updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts: parts || [], other: other || [], services: services || [], charge_other: charge_other || [], bike_id });
+    res.json({ id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update job' });
   }
 });
 

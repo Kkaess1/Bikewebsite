@@ -18,6 +18,9 @@ function escapeHtml(str) {
 let allCustomers = [];
 let allParts = [];
 let allBikes = [];
+let editJobId = null;
+let editJobChargeOther = [];
+let editJobOther = [];
 
 // ─── Load Data ────────────────────────────────────────────────────────────────
 async function loadAllCustomers() {
@@ -297,7 +300,7 @@ async function saveNewBike() {
 // ═══════════════════════════════════════════════════════════════════════════════
 // PARTS ROWS (catalog dropdown)
 // ═══════════════════════════════════════════════════════════════════════════════
-function createPartRow(container) {
+function createPartRow(container, { noFocus = false } = {}) {
   const row = document.createElement('div');
   row.className = 'line-item-row';
   row.dataset.partId = '';
@@ -369,11 +372,11 @@ function createPartRow(container) {
   row.appendChild(priceInput);
   row.appendChild(removeBtn);
   container.appendChild(row);
-  nameInput.focus();
+  if (!noFocus) nameInput.focus();
   return row;
 }
 
-function createSimpleRow(container, descPlaceholder) {
+function createSimpleRow(container, descPlaceholder, { noFocus = false } = {}) {
   const row = document.createElement('div');
   row.className = 'line-item-row';
   row.innerHTML = `
@@ -384,7 +387,7 @@ function createSimpleRow(container, descPlaceholder) {
   row.querySelector('.price-input').addEventListener('input', recalculate);
   row.querySelector('.btn-remove').addEventListener('click', () => { row.remove(); recalculate(); });
   container.appendChild(row);
-  row.querySelector('.desc-input').focus();
+  if (!noFocus) row.querySelector('.desc-input').focus();
   return row;
 }
 
@@ -550,40 +553,44 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const charge_other = [];
   const notes = document.getElementById('job-notes').value.trim();
   const estimatedCompletion = document.getElementById('estimated-completion').value.trim();
-  const sendNotification    = document.getElementById('send-notification').checked;
   const bike_id             = bikeIdInput.value ? parseInt(bikeIdInput.value) : null;
-  const reminders           = getScheduledReminders();
 
   const saveBtn = document.getElementById('save-btn');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
 
   try {
-    const res = await fetch('/api/jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_id: parseInt(customerId),
-        notes,
-        estimated_completion: estimatedCompletion,
-        parts,
-        other,
-        services,
-        charge_other,
-        bike_id,
-        send_notification: sendNotification,
-        reminders,
-      }),
-    });
+    let res;
+    if (editJobId) {
+      res = await fetch(`/api/jobs/${editJobId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other: editJobOther, services, charge_other: editJobChargeOther, bike_id }),
+      });
+    } else {
+      const sendNotification = document.getElementById('send-notification').checked;
+      const reminders        = getScheduledReminders();
+      res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other, services, charge_other, bike_id, send_notification: sendNotification, reminders }),
+      });
+    }
 
     const data = await res.json();
     if (res.ok) {
-      let msg = 'Job saved successfully!';
-      if (data.invoice?.sent) msg += ' Invoice emailed.';
-      if (sendNotification && data.sms?.sent) msg += ' Text sent.';
-      else if (sendNotification && data.sms?.skipped) msg += ` (SMS skipped: ${data.sms.reason})`;
-      showSuccess(msg);
-      setTimeout(() => window.location.href = '/', 1500);
+      if (editJobId) {
+        showSuccess('Job updated!');
+        setTimeout(() => window.location.href = '/customers.html', 1000);
+      } else {
+        let msg = 'Job saved successfully!';
+        if (data.invoice?.sent) msg += ' Invoice emailed.';
+        const sendNotification = document.getElementById('send-notification').checked;
+        if (sendNotification && data.sms?.sent) msg += ' Text sent.';
+        else if (sendNotification && data.sms?.skipped) msg += ` (SMS skipped: ${data.sms.reason})`;
+        showSuccess(msg);
+        setTimeout(() => window.location.href = '/', 1500);
+      }
     } else {
       showError(data.error || 'Failed to save job');
     }
@@ -591,7 +598,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     showError('Connection error. Please try again.');
   } finally {
     saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Job';
+    saveBtn.textContent = editJobId ? 'Save Changes' : 'Save Job';
   }
 });
 
@@ -646,10 +653,91 @@ function setupNoteField() {
   textarea.addEventListener('blur', collapse);
 }
 
+// ─── Edit Mode Prefill ────────────────────────────────────────────────────────
+async function prefillEditMode(jobId) {
+  let job;
+  try {
+    const res = await fetch(`/api/jobs/${jobId}/data`);
+    if (!res.ok) { showError('Could not load job for editing.'); return; }
+    job = await res.json();
+  } catch { showError('Connection error loading job.'); return; }
+
+  // Preserve fields the form doesn't edit
+  editJobChargeOther = job.charge_other || [];
+  editJobOther       = job.other || [];
+
+  // Customer
+  const customer = allCustomers.find(c => c.id === job.customer_id);
+  if (customer) selectCustomer(customer.id, customer.name);
+  else { customerIdInput.value = job.customer_id; }
+
+  // Bike
+  if (job.bike_id) {
+    const bike = allBikes.find(b => b.id === job.bike_id);
+    if (bike) selectBike(bike.id, bike.name);
+  }
+
+  // Completion date
+  if (job.estimated_completion) {
+    document.getElementById('estimated-completion').value = job.estimated_completion;
+  }
+
+  // Notes
+  if (job.notes) {
+    const textarea = document.getElementById('job-notes');
+    const trigger  = document.getElementById('add-note-trigger');
+    const expand   = document.getElementById('note-expand');
+    textarea.value = job.notes;
+    trigger.classList.add('hidden');
+    expand.classList.add('open');
+  }
+
+  // Parts rows
+  const partsContainer = document.getElementById('parts-list');
+  partsContainer.innerHTML = '';
+  (job.parts || []).forEach(p => {
+    const row = createPartRow(partsContainer, { noFocus: true });
+    row.querySelector('.desc-input').value = p.description;
+    row.querySelector('.price-input').value = Number(p.price).toFixed(2);
+    if (p.part_id) {
+      row.dataset.partId = p.part_id;
+      const catalogPart = allParts.find(ap => ap.id === p.part_id);
+      if (catalogPart) {
+        row.dataset.followUpValue = catalogPart.follow_up_value || '';
+        row.dataset.followUpUnit  = catalogPart.follow_up_unit  || '';
+      }
+    }
+  });
+
+  // Service rows
+  const servicesContainer = document.getElementById('services-list');
+  servicesContainer.innerHTML = '';
+  (job.services || []).forEach(s => {
+    const row = createSimpleRow(servicesContainer, 'Service description', { noFocus: true });
+    row.querySelector('.desc-input').value = s.description;
+    row.querySelector('.price-input').value = Number(s.price).toFixed(2);
+  });
+
+  recalculate();
+
+  // UI adjustments for edit mode
+  document.title = 'Edit Job — B-Rads Bikes';
+  document.getElementById('save-btn').textContent = 'Save Changes';
+  document.getElementById('notifications-card').style.display = 'none';
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+const editParam = urlParams.get('edit');
+if (editParam) editJobId = parseInt(editParam);
+
 Promise.all([loadAllCustomers(), loadAllParts(), loadAllBikes()]).then(() => {
-  createPartRow(document.getElementById('parts-list'));
-  createSimpleRow(document.getElementById('services-list'), 'Service description');
+  if (editJobId) {
+    prefillEditMode(editJobId);
+  } else {
+    createPartRow(document.getElementById('parts-list'));
+    createSimpleRow(document.getElementById('services-list'), 'Service description');
+  }
   setupNoteField();
   window.scrollTo(0, 0);
 });

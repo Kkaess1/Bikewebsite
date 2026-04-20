@@ -35,9 +35,9 @@ There are no build steps, linters, or tests. Changes to server-side files requir
 
 **Job data model:**
 - A `jobs` row holds `customer_cost` (auto-calculated server-side) and `estimated_completion`
-- Line items split across five child tables: `job_parts`, `job_labor`, `job_other`, `job_services`, `job_charge_other`
+- Line items split across four child tables: `job_parts`, `job_other`, `job_services`, `job_charge_other`
 - **Expenses** = `job_parts` + `job_other` totals only
-- **Customer cost** = `job_services` + `job_labor` + `job_charge_other` totals (computed in `routes/jobs.js` before insert, never entered manually)
+- **Customer cost** = `job_services` + `job_charge_other` totals (computed in `routes/jobs.js` before insert, never entered manually)
 - **Profit** = customer_cost − expenses
 
 **SMS notifications:**
@@ -58,5 +58,4 @@ There are no build steps, linters, or tests. Changes to server-side files requir
 - After any write in `queries.js`, `saveDb()` must be called or the change is lost on restart
 - `req.path` inside a router is relative (always `/`); use `req.originalUrl` to check full paths
 - sql.js's `run()` does not return affected rows; last insert ID is retrieved via `SELECT last_insert_rowid()`
-- `job_labor` uses column name `cost`; all other line item tables use `price` — mixing these up causes silent 0s
 - Foreign keys are enabled via `PRAGMA foreign_keys = ON` but `deleteCustomer` manually cascades deletes because sql.js's FK cascade support can be unreliable

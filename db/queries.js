@@ -62,7 +62,6 @@ function deleteCustomer(id) {
     const jobs = all('SELECT id FROM jobs WHERE customer_id = ?', [id]);
     for (const job of jobs) {
       db.run('DELETE FROM job_parts WHERE job_id = ?', [job.id]);
-      db.run('DELETE FROM job_labor WHERE job_id = ?', [job.id]);
       db.run('DELETE FROM job_other WHERE job_id = ?', [job.id]);
       db.run('DELETE FROM job_services WHERE job_id = ?', [job.id]);
       db.run('DELETE FROM job_charge_other WHERE job_id = ?', [job.id]);
@@ -197,6 +196,68 @@ function createJob({ customer_id, notes, customer_cost, estimated_completion, pa
     db.run('COMMIT');
     saveDb();
     return jobId;
+  } catch (err) {
+    db.run('ROLLBACK');
+    throw err;
+  }
+}
+
+function getJobById(id) {
+  const job = get(
+    `SELECT j.id, j.date, j.notes, j.customer_cost, j.estimated_completion, j.customer_id, j.bike_id,
+            b.name AS bike_name
+     FROM jobs j
+     LEFT JOIN bikes b ON b.id = j.bike_id
+     WHERE j.id = ?`,
+    [id]
+  );
+  if (!job) return null;
+  const parts        = all('SELECT part_id, description, price FROM job_parts WHERE job_id = ?', [id]);
+  const other        = all('SELECT description, price FROM job_other WHERE job_id = ?', [id]);
+  const services     = all('SELECT description, price FROM job_services WHERE job_id = ?', [id]);
+  const charge_other = all('SELECT description, price FROM job_charge_other WHERE job_id = ?', [id]);
+  return { ...job, parts, other, services, charge_other };
+}
+
+function updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id }) {
+  const db = getDb();
+  db.run('BEGIN TRANSACTION');
+  try {
+    db.run(
+      'UPDATE jobs SET customer_id=?, notes=?, customer_cost=?, estimated_completion=?, bike_id=? WHERE id=?',
+      [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, id]
+    );
+    db.run('DELETE FROM job_parts WHERE job_id=?', [id]);
+    db.run('DELETE FROM job_other WHERE job_id=?', [id]);
+    db.run('DELETE FROM job_services WHERE job_id=?', [id]);
+    db.run('DELETE FROM job_charge_other WHERE job_id=?', [id]);
+
+    for (const p of (parts || [])) {
+      if (p.description?.trim()) {
+        db.run('INSERT INTO job_parts (job_id, part_id, description, price) VALUES (?, ?, ?, ?)',
+          [id, p.part_id || null, p.description.trim(), parseFloat(p.price) || 0]);
+      }
+    }
+    for (const o of (other || [])) {
+      if (o.description?.trim()) {
+        db.run('INSERT INTO job_other (job_id, description, price) VALUES (?, ?, ?)',
+          [id, o.description.trim(), parseFloat(o.price) || 0]);
+      }
+    }
+    for (const sv of (services || [])) {
+      if (sv.description?.trim()) {
+        db.run('INSERT INTO job_services (job_id, description, price) VALUES (?, ?, ?)',
+          [id, sv.description.trim(), parseFloat(sv.price) || 0]);
+      }
+    }
+    for (const co of (charge_other || [])) {
+      if (co.description?.trim()) {
+        db.run('INSERT INTO job_charge_other (job_id, description, price) VALUES (?, ?, ?)',
+          [id, co.description.trim(), parseFloat(co.price) || 0]);
+      }
+    }
+    db.run('COMMIT');
+    saveDb();
   } catch (err) {
     db.run('ROLLBACK');
     throw err;
@@ -390,6 +451,8 @@ module.exports = {
   deleteCustomer,
   getCustomerById,
   createJob,
+  getJobById,
+  updateJob,
   getAllParts,
   getPartById,
   createPart,
