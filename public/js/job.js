@@ -4,6 +4,15 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   window.location.href = '/login';
 });
 
+// ─── Local date helper (avoids UTC-midnight off-by-one) ──────────────────────
+function todayLocalStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // ─── HTML escape helper ───────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str || '')
@@ -195,6 +204,13 @@ async function saveEditCustomer() {
     errorEl.style.display = '';
   }
 }
+
+// ─── Completion Date: hide notifications when date is in the past ─────────────
+document.getElementById('estimated-completion').addEventListener('change', function () {
+  const val = this.value;
+  const isPast = val !== '' && val < todayLocalStr();
+  document.getElementById('notifications-card').style.display = isPast ? 'none' : '';
+});
 
 // ─── SMS notification warning ─────────────────────────────────────────────────
 document.getElementById('send-notification').addEventListener('change', function () {
@@ -499,16 +515,26 @@ function sumList(containerId) {
 function fmt(n) { return '$' + n.toFixed(2); }
 
 function recalculate() {
-  const parts = sumList('parts-list');
+  const parts    = sumList('parts-list');
   const services = sumList('services-list');
+  const tip      = parseFloat(document.getElementById('tip-input').value) || 0;
 
-  const expenses = parts;
+  const expenses      = parts;
   const customer_cost = services;
-  const profit        = customer_cost - expenses;
+  const profit        = customer_cost + tip - expenses;
 
   document.getElementById('total-expenses').textContent = fmt(expenses);
   document.getElementById('services-total').textContent = fmt(services);
   document.getElementById('customer-cost-display').textContent = fmt(customer_cost);
+
+  const tipBox = document.getElementById('tip-display-box');
+  if (tip > 0) {
+    document.getElementById('tip-display').textContent = fmt(tip);
+    tipBox.style.display = '';
+  } else {
+    tipBox.style.display = 'none';
+  }
+
   document.getElementById('profit-amount').textContent = fmt(profit);
 
   const profitBox = document.getElementById('profit-box');
@@ -517,6 +543,8 @@ function recalculate() {
   if (profit > 0) profitBox.classList.add('profit-positive');
   else if (profit < 0) profitBox.classList.add('profit-negative');
 }
+
+document.getElementById('tip-input').addEventListener('input', recalculate);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COLLECT & SAVE
@@ -562,18 +590,22 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     let res;
     if (editJobId) {
+      const tip = parseFloat(document.getElementById('tip-input').value) || 0;
       res = await fetch(`/api/jobs/${editJobId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other: editJobOther, services, charge_other: editJobChargeOther, bike_id }),
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other: editJobOther, services, charge_other: editJobChargeOther, bike_id, tip }),
       });
     } else {
       const sendNotification = document.getElementById('send-notification').checked;
       const reminders        = getScheduledReminders();
+      const is_past_job      = estimatedCompletion !== '' && estimatedCompletion < todayLocalStr();
+      const job_date         = is_past_job ? estimatedCompletion : todayLocalStr();
+      const tip              = parseFloat(document.getElementById('tip-input').value) || 0;
       res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other, services, charge_other, bike_id, send_notification: sendNotification, reminders }),
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other, services, charge_other, bike_id, send_notification: sendNotification, reminders, job_date, is_past_job, tip }),
       });
     }
 
@@ -680,6 +712,11 @@ async function prefillEditMode(jobId) {
   // Completion date
   if (job.estimated_completion) {
     document.getElementById('estimated-completion').value = job.estimated_completion;
+  }
+
+  // Tip
+  if (job.tip) {
+    document.getElementById('tip-input').value = Number(job.tip).toFixed(2);
   }
 
   // Notes

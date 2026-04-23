@@ -107,7 +107,7 @@
         <div id="edit-customer-error" style="color:#c00;font-size:0.82rem;margin-top:6px;display:none;"></div>
       </div>
 
-      <!-- Estimated Completion Date — always visible -->
+      <!-- Completion Date -->
       <div class="completion-row" style="margin-top:16px;">
         <div class="completion-content">
           <div class="completion-label">Completion Date</div>
@@ -208,7 +208,17 @@
       <!-- Services list -->
       <div class="section-title">Services</div>
       <div class="line-items" id="services-list"></div>
-      <button class="btn btn-add" id="add-service-btn">+ Add Service</button>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-add" id="add-service-btn">+ Add Service</button>
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:0.88rem;color:#555;">
+          <label for="tip-input" style="font-weight:600;white-space:nowrap;">Tip:</label>
+          <div style="display:flex;align-items:center;border:1px solid #C8D0DC;border-radius:5px;background:#fff;overflow:hidden;">
+            <span style="padding:5px 7px;color:#888;font-size:0.88rem;">$</span>
+            <input type="text" inputmode="decimal" id="tip-input" placeholder="0.00"
+              style="width:70px;border:none;outline:none;padding:5px 6px 5px 0;font-size:0.88rem;">
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Totals -->
@@ -224,6 +234,10 @@
         <div class="total-box">
           <label>Services Total</label>
           <div class="amount" id="services-total">$0.00</div>
+        </div>
+        <div class="total-box" id="tip-display-box" style="display:none;">
+          <label>Tip</label>
+          <div class="amount" id="tip-display" style="color:#1a7a1a;">$0.00</div>
         </div>
         <div class="total-box highlight">
           <label>Customer Cost</label>

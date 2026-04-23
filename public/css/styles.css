@@ -297,21 +297,24 @@ textarea { resize: vertical; min-height: 70px; }
 /* ─── Report Filters ───────────────────────────────────────────────────────── */
 .filter-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .filter-btn {
-  padding: 7px 16px;
+  padding: 6px 12px;
   border: 1.5px solid #C8D0DC;
   border-radius: 20px;
   background: #FFFFFF;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   color: #002244;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -323,6 +326,9 @@ textarea { resize: vertical; min-height: 70px; }
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #E8EBF0;
 }
 
 .custom-range.visible { display: flex; }

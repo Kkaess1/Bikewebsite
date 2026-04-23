@@ -159,6 +159,7 @@ function renderDetail(customer) {
         <div class="job-detail" id="${amountsId}">
           <span class="job-history-amounts">
             Charged: <strong>$${job.customer_cost.toFixed(2)}</strong>
+            ${job.tip > 0 ? `&nbsp;&nbsp;Tip: <strong style="color:#1a7a1a;">$${job.tip.toFixed(2)}</strong>` : ''}
             &nbsp;&nbsp;Profit: <strong class="${profitClass}">$${job.profit.toFixed(2)}</strong>
           </span>
         </div>

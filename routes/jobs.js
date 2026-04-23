@@ -201,10 +201,14 @@ router.post('/', async (req, res) => {
       reminders,
       job_date,
       is_past_job,
+      tip,
     } = req.body;
 
     if (!customer_id) {
       return res.status(400).json({ error: 'Customer is required' });
+    }
+    if (job_date && !/^\d{4}-\d{2}-\d{2}$/.test(job_date)) {
+      return res.status(400).json({ error: 'job_date must be in YYYY-MM-DD format' });
     }
 
     // Compute customer_cost server-side: services + charge_other (labor removed)
@@ -212,13 +216,13 @@ router.post('/', async (req, res) => {
     const charge_other_total = (charge_other || []).reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
     const customer_cost = services_total + charge_other_total;
 
-    const jobId = createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date });
+    const jobId = createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date, tip: parseFloat(tip) || 0 });
 
     const customer = getCustomerById(parseInt(customer_id));
     const bike = bike_id ? getBikeById(parseInt(bike_id)) : null;
 
-    // Schedule follow-up reminders if opted in
-    if (reminders && reminders.length > 0 && customer) {
+    // Schedule follow-up reminders if opted in — skip for past jobs
+    if (!is_past_job && reminders && reminders.length > 0 && customer) {
       const shopContact = getShopContactText();
       for (const r of reminders) {
         if (!r.part_name || !r.follow_up_value || !r.follow_up_unit) continue;
@@ -331,7 +335,7 @@ router.get('/:id/data', (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { customer_id, notes, estimated_completion, parts, other, services, charge_other, bike_id } = req.body;
+    const { customer_id, notes, estimated_completion, parts, other, services, charge_other, bike_id, tip } = req.body;
 
     if (!customer_id) return res.status(400).json({ error: 'Customer is required' });
 
@@ -339,7 +343,7 @@ router.put('/:id', async (req, res) => {
     const charge_other_total = (charge_other || []).reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
     const customer_cost = services_total + charge_other_total;
 
-    updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts: parts || [], other: other || [], services: services || [], charge_other: charge_other || [], bike_id });
+    updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts: parts || [], other: other || [], services: services || [], charge_other: charge_other || [], bike_id, tip: parseFloat(tip) || 0 });
     res.json({ id });
   } catch (err) {
     console.error(err);

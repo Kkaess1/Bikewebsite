@@ -85,7 +85,7 @@ function getCustomerById(id) {
   if (!customer) return null;
 
   const jobs = all(
-    `SELECT j.id, j.date, j.notes, j.customer_cost, j.estimated_completion, j.bike_id,
+    `SELECT j.id, j.date, j.notes, j.customer_cost, j.tip, j.estimated_completion, j.bike_id,
             b.name AS bike_name
      FROM jobs j
      LEFT JOIN bikes b ON b.id = j.bike_id
@@ -108,9 +108,10 @@ function getCustomerById(id) {
     const services_total = servicesRows.reduce((s, sv) => s + (sv.price || 0), 0);
     const charge_other_total = chargeOtherRows.reduce((s, co) => s + (co.price || 0), 0);
     const expenses = parts_total + other_total;
-    const profit = (job.customer_cost || 0) - expenses;
+    const tip = job.tip || 0;
+    const profit = (job.customer_cost || 0) + tip - expenses;
 
-    total_revenue += job.customer_cost || 0;
+    total_revenue += (job.customer_cost || 0) + tip;
     total_expenses += expenses;
 
     return {
@@ -129,6 +130,7 @@ function getCustomerById(id) {
       charge_other_total: round2(charge_other_total),
       total_expenses: round2(expenses),
       customer_cost: round2(job.customer_cost || 0),
+      tip: round2(tip),
       profit: round2(profit),
     };
   });
@@ -147,18 +149,18 @@ function getCustomerById(id) {
 
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 
-function createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date }) {
+function createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date, tip }) {
   const db = getDb();
 
   db.run('BEGIN TRANSACTION');
   try {
     const jobId = run(
       job_date
-        ? 'INSERT INTO jobs (customer_id, notes, customer_cost, estimated_completion, bike_id, date) VALUES (?, ?, ?, ?, ?, ?)'
-        : 'INSERT INTO jobs (customer_id, notes, customer_cost, estimated_completion, bike_id) VALUES (?, ?, ?, ?, ?)',
+        ? 'INSERT INTO jobs (customer_id, notes, customer_cost, estimated_completion, bike_id, date, tip) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        : 'INSERT INTO jobs (customer_id, notes, customer_cost, estimated_completion, bike_id, tip) VALUES (?, ?, ?, ?, ?, ?)',
       job_date
-        ? [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, job_date]
-        : [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null]
+        ? [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, job_date, tip || 0]
+        : [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, tip || 0]
     );
 
     for (const p of (parts || [])) {
@@ -204,7 +206,7 @@ function createJob({ customer_id, notes, customer_cost, estimated_completion, pa
 
 function getJobById(id) {
   const job = get(
-    `SELECT j.id, j.date, j.notes, j.customer_cost, j.estimated_completion, j.customer_id, j.bike_id,
+    `SELECT j.id, j.date, j.notes, j.customer_cost, j.tip, j.estimated_completion, j.customer_id, j.bike_id,
             b.name AS bike_name
      FROM jobs j
      LEFT JOIN bikes b ON b.id = j.bike_id
@@ -219,13 +221,13 @@ function getJobById(id) {
   return { ...job, parts, other, services, charge_other };
 }
 
-function updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id }) {
+function updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, tip }) {
   const db = getDb();
   db.run('BEGIN TRANSACTION');
   try {
     db.run(
-      'UPDATE jobs SET customer_id=?, notes=?, customer_cost=?, estimated_completion=?, bike_id=? WHERE id=?',
-      [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, id]
+      'UPDATE jobs SET customer_id=?, notes=?, customer_cost=?, estimated_completion=?, bike_id=?, tip=? WHERE id=?',
+      [customer_id, notes || '', customer_cost || 0, estimated_completion || '', bike_id || null, tip || 0, id]
     );
     db.run('DELETE FROM job_parts WHERE job_id=?', [id]);
     db.run('DELETE FROM job_other WHERE job_id=?', [id]);
@@ -358,7 +360,7 @@ function markReminderSent(id) {
 
 function getReport(from, to) {
   const jobs = all(
-    `SELECT j.id, j.date, j.notes, j.customer_cost, j.bike_id,
+    `SELECT j.id, j.date, j.notes, j.customer_cost, j.tip, j.bike_id,
             c.name AS customer_name, b.name AS bike_name
      FROM jobs j
      JOIN customers c ON c.id = j.customer_id
@@ -381,7 +383,8 @@ function getReport(from, to) {
     const services_total = servicesRows.reduce((s, sv) => s + (sv.price || 0), 0);
     const charge_other_total = chargeOtherRows.reduce((s, co) => s + (co.price || 0), 0);
     const total_expenses = parts_total + other_total;
-    const profit = (job.customer_cost || 0) - total_expenses;
+    const tip = job.tip || 0;
+    const profit = (job.customer_cost || 0) + tip - total_expenses;
 
     result.push({
       id: job.id,
@@ -399,6 +402,7 @@ function getReport(from, to) {
       charge_other_total: round2(charge_other_total),
       total_expenses: round2(total_expenses),
       customer_cost: round2(job.customer_cost || 0),
+      tip: round2(tip),
       profit: round2(profit),
     });
   }
@@ -421,7 +425,8 @@ function getReport(from, to) {
     services_total: round2(result.reduce((s, j) => s + j.services_total, 0)),
     charge_other_total: round2(result.reduce((s, j) => s + j.charge_other_total, 0)),
     total_expenses: round2(result.reduce((s, j) => s + j.total_expenses, 0)),
-    total_revenue: round2(result.reduce((s, j) => s + j.customer_cost, 0)),
+    tips_total: round2(result.reduce((s, j) => s + j.tip, 0)),
+    total_revenue: round2(result.reduce((s, j) => s + j.customer_cost + j.tip, 0)),
     total_profit: round2(result.reduce((s, j) => s + j.profit, 0)),
   };
 

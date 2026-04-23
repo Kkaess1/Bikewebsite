@@ -42,6 +42,7 @@
         <button class="filter-btn" data-preset="month">This Month</button>
         <button class="filter-btn" data-preset="quarter">This Quarter</button>
         <button class="filter-btn" data-preset="quarterly">By Quarter</button>
+        <button class="filter-btn" data-preset="monthly">By Month</button>
         <button class="filter-btn" data-preset="year">This Year</button>
         <button class="filter-btn" data-preset="custom">Custom Range</button>
       </div>
@@ -50,6 +51,27 @@
         <button class="filter-btn" data-q="2">Q2 (Apr-Jun)</button>
         <button class="filter-btn" data-q="3">Q3 (Jul-Sep)</button>
         <button class="filter-btn" data-q="4">Q4 (Oct-Dec)</button>
+      </div>
+      <div class="custom-range" id="monthly-select">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <button id="month-year-prev" class="btn btn-secondary" style="padding:3px 12px;font-size:1rem;">&#8249;</button>
+          <span id="month-year-label" style="font-weight:700;font-size:1rem;min-width:48px;text-align:center;"></span>
+          <button id="month-year-next" class="btn btn-secondary" style="padding:3px 12px;font-size:1rem;">&#8250;</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+          <button class="filter-btn" data-month="1">Jan</button>
+          <button class="filter-btn" data-month="2">Feb</button>
+          <button class="filter-btn" data-month="3">Mar</button>
+          <button class="filter-btn" data-month="4">Apr</button>
+          <button class="filter-btn" data-month="5">May</button>
+          <button class="filter-btn" data-month="6">Jun</button>
+          <button class="filter-btn" data-month="7">Jul</button>
+          <button class="filter-btn" data-month="8">Aug</button>
+          <button class="filter-btn" data-month="9">Sep</button>
+          <button class="filter-btn" data-month="10">Oct</button>
+          <button class="filter-btn" data-month="11">Nov</button>
+          <button class="filter-btn" data-month="12">Dec</button>
+        </div>
       </div>
       <div class="custom-range" id="custom-range">
         <label>From</label>
@@ -79,6 +101,7 @@
           <button class="chart-toggle active" data-metric="revenue">Revenue</button>
           <button class="chart-toggle active" data-metric="expenses">Expenses</button>
           <button class="chart-toggle active" data-metric="profit">Profit</button>
+          <button class="chart-toggle" data-metric="tips">Tips</button>
           <button class="chart-toggle active" data-metric="jobs">Job Count</button>
         </div>
       </div>
