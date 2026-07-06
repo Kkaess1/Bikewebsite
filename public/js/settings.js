@@ -21,7 +21,7 @@ async function loadSettings() {
       statusEl.innerHTML = '<span style="color:#b86000;font-size:0.88rem;">&#9888; Gmail not configured — text notifications are disabled</span>';
     }
 
-    if (data.shop_phone) document.getElementById('shop-phone').value = data.shop_phone;
+    if (data.shop_phone) document.getElementById('shop-phone').value = formatPhone(data.shop_phone);
     if (data.shop_carrier) document.getElementById('shop-carrier').value = data.shop_carrier;
   } catch {
     // ignore
@@ -180,5 +180,9 @@ document.getElementById('save-shop-btn').addEventListener('click', async () => {
     btn.textContent = 'Save Shop Contact';
   }
 });
+
+// Phone input masks
+attachPhoneMask(document.getElementById('test-phone'));
+attachPhoneMask(document.getElementById('shop-phone'));
 
 loadSettings();

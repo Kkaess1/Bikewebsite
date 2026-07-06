@@ -39,18 +39,26 @@ function getPresetRange(preset) {
 const filterBtns = document.querySelectorAll('.filter-btn[data-preset]');
 const customRange = document.getElementById('custom-range');
 const quarterlySelect = document.getElementById('quarterly-select');
+const monthlySelect = document.getElementById('monthly-select');
+
+function hideAllSubpanels() {
+  customRange.classList.remove('visible');
+  quarterlySelect.classList.remove('visible');
+  monthlySelect.classList.remove('visible');
+}
 
 filterBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     filterBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const preset = btn.dataset.preset;
-    customRange.classList.remove('visible');
-    quarterlySelect.classList.remove('visible');
+    hideAllSubpanels();
     if (preset === 'custom') {
       customRange.classList.add('visible');
     } else if (preset === 'quarterly') {
       quarterlySelect.classList.add('visible');
+    } else if (preset === 'monthly') {
+      monthlySelect.classList.add('visible');
     } else {
       const { from, to } = getPresetRange(preset);
       loadReport(from, to);
@@ -72,6 +80,39 @@ document.querySelectorAll('.filter-btn[data-q]').forEach(btn => {
     loadReport(from, to);
   });
 });
+
+// ─── By Month picker ──────────────────────────────────────────────────────────
+let monthPickerYear = new Date().getFullYear();
+
+function updateMonthYearLabel() {
+  document.getElementById('month-year-label').textContent = monthPickerYear;
+}
+
+function loadMonth(month) {
+  const from = `${monthPickerYear}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(monthPickerYear, month, 0).getDate();
+  const to = `${monthPickerYear}-${String(month).padStart(2, '0')}-${lastDay}`;
+  loadReport(from, to);
+}
+
+document.getElementById('month-year-prev').addEventListener('click', () => {
+  monthPickerYear--;
+  updateMonthYearLabel();
+});
+document.getElementById('month-year-next').addEventListener('click', () => {
+  monthPickerYear++;
+  updateMonthYearLabel();
+});
+
+document.querySelectorAll('.filter-btn[data-month]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn[data-month]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadMonth(parseInt(btn.dataset.month));
+  });
+});
+
+updateMonthYearLabel();
 
 document.getElementById('custom-apply-btn').addEventListener('click', () => {
   const from = document.getElementById('from-date').value;
@@ -128,7 +169,7 @@ function groupJobs(jobs, from, to) {
   const end = parseDate(to);
   while (cur <= end) {
     const key = bucketKey(cur, grouping);
-    if (!buckets[key]) buckets[key] = { revenue: 0, expenses: 0, profit: 0, jobs: 0, label: bucketLabel(cur, grouping) };
+    if (!buckets[key]) buckets[key] = { revenue: 0, expenses: 0, profit: 0, tips: 0, jobs: 0, label: bucketLabel(cur, grouping) };
     if (grouping === 'day')   cur.setDate(cur.getDate() + 1);
     else if (grouping === 'week')  cur.setDate(cur.getDate() + 7);
     else cur.setMonth(cur.getMonth() + 1);
@@ -138,9 +179,10 @@ function groupJobs(jobs, from, to) {
     const d = parseDate(job.date);
     const key = bucketKey(d, grouping);
     if (buckets[key]) {
-      buckets[key].revenue   += job.customer_cost;
+      buckets[key].revenue   += job.customer_cost + (job.tip || 0);
       buckets[key].expenses  += job.total_expenses;
       buckets[key].profit    += job.profit;
+      buckets[key].tips      += job.tip || 0;
       buckets[key].jobs      += 1;
     }
   }
@@ -182,6 +224,7 @@ function renderChart(jobs, from, to) {
   if (activeMetrics.has('revenue'))  datasets.push({ label: 'Revenue',   data: grouped.map(b => +b.revenue.toFixed(2)),  backgroundColor: 'rgba(26,95,168,0.75)',  borderColor: '#1a5fa8', borderWidth: 1 });
   if (activeMetrics.has('expenses')) datasets.push({ label: 'Expenses',  data: grouped.map(b => +b.expenses.toFixed(2)), backgroundColor: 'rgba(184,96,0,0.75)',   borderColor: '#b86000', borderWidth: 1 });
   if (activeMetrics.has('profit'))   datasets.push({ label: 'Profit',    data: grouped.map(b => +b.profit.toFixed(2)),   backgroundColor: 'rgba(26,122,26,0.75)',  borderColor: '#1a7a1a', borderWidth: 1 });
+  if (activeMetrics.has('tips'))     datasets.push({ label: 'Tips',      data: grouped.map(b => +b.tips.toFixed(2)),     backgroundColor: 'rgba(255,193,7,0.85)',  borderColor: '#c79a00', borderWidth: 1 });
   if (activeMetrics.has('jobs'))     datasets.push({ label: 'Job Count', data: grouped.map(b => b.jobs),                  backgroundColor: 'rgba(122,26,122,0.75)', borderColor: '#7a1a7a', borderWidth: 1, yAxisID: 'y2' });
 
   document.getElementById('chart-card').style.display = '';
@@ -246,6 +289,7 @@ document.querySelectorAll('.chart-toggle').forEach(btn => {
       if (activeMetrics.has('revenue'))  datasets.push({ label: 'Revenue',   data: lastChartData.map(b => +b.revenue.toFixed(2)),  backgroundColor: 'rgba(26,95,168,0.75)',  borderColor: '#1a5fa8', borderWidth: 1 });
       if (activeMetrics.has('expenses')) datasets.push({ label: 'Expenses',  data: lastChartData.map(b => +b.expenses.toFixed(2)), backgroundColor: 'rgba(184,96,0,0.75)',   borderColor: '#b86000', borderWidth: 1 });
       if (activeMetrics.has('profit'))   datasets.push({ label: 'Profit',    data: lastChartData.map(b => +b.profit.toFixed(2)),   backgroundColor: 'rgba(26,122,26,0.75)',  borderColor: '#1a7a1a', borderWidth: 1 });
+      if (activeMetrics.has('tips'))     datasets.push({ label: 'Tips',      data: lastChartData.map(b => +b.tips.toFixed(2)),     backgroundColor: 'rgba(255,193,7,0.85)',  borderColor: '#c79a00', borderWidth: 1 });
       if (activeMetrics.has('jobs'))     datasets.push({ label: 'Job Count', data: lastChartData.map(b => b.jobs),                  backgroundColor: 'rgba(122,26,122,0.75)', borderColor: '#7a1a7a', borderWidth: 1, yAxisID: 'y2' });
       chartInstance.data.labels = labels;
       chartInstance.data.datasets = datasets;
@@ -268,6 +312,9 @@ function renderReport({ jobs, summary }, from, to) {
   document.getElementById('summary-card').style.display = '';
 
   // Summary boxes
+  const tipsBox = summary.tips_total > 0
+    ? `<div class="total-box"><label>Tips Total</label><div class="amount" style="color:#1a7a1a;">${fmt(summary.tips_total)}</div></div>`
+    : '';
   document.getElementById('summary-grid').innerHTML = `
     <div class="total-box">
       <label>Jobs</label>
@@ -281,10 +328,7 @@ function renderReport({ jobs, summary }, from, to) {
       <label>Services Total</label>
       <div class="amount">${fmt(summary.services_total)}</div>
     </div>
-    <div class="total-box">
-      <label>Other Charges Total</label>
-      <div class="amount">${fmt(summary.charge_other_total)}</div>
-    </div>
+    ${tipsBox}
     <div class="total-box">
       <label>Total Revenue</label>
       <div class="amount">${fmt(summary.total_revenue)}</div>

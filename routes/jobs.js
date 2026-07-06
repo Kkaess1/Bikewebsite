@@ -6,6 +6,15 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+// ─── Phone display formatting: 10-digit numbers become xxx-xxx-xxxx ──────────
+function formatPhone(str) {
+  const s = String(str || '').trim();
+  let digits = s.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length !== 10) return s;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 // ─── HTML escape helper ───────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str || '')
@@ -52,22 +61,19 @@ async function sendSms(phone, carrier, text) {
 }
 
 function getShopContactText() {
-  const configured = (getSetting('shop_phone') || '').trim();
-  return configured || '(714)-235-5959';
+  const configured = formatPhone((getSetting('shop_phone') || '').trim());
+  return configured || '714-235-5959';
 }
 
-// ─── Send job-start SMS ───────────────────────────────────────────────────────
-async function sendJobStartSms(customer, estimatedCompletion, customerCost, services) {
-  const completionFormatted = estimatedCompletion
-    ? new Date(estimatedCompletion + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    : null;
-  const completion = completionFormatted ? ` Estimated completion: ${completionFormatted}.` : '';
+// ─── Send job-finished SMS ────────────────────────────────────────────────────
+async function sendJobFinishedSms(customer, customerCost, services, invoiceWasEmailed) {
   const cost = customerCost > 0 ? ` Total: $${Number(customerCost).toFixed(2)}.` : '';
   const serviceItems = (services || []).filter(s => s.description?.trim()).map(s => s.description.trim());
   const servicesText = serviceItems.length > 0 ? ` Services: ${serviceItems.join(', ')}.` : '';
+  const invoiceText = invoiceWasEmailed ? ' An invoice has been emailed to you.' : '';
 
   const shopContact = getShopContactText();
-  const text = `Hi ${customer.name}, I've started working on your bike!${servicesText}${cost}${completion} I'll reach out when it's ready. Please do not reply to this message. Please text ${shopContact} if you need to reach me.`;
+  const text = `Hi ${customer.name}, your bike is finished and ready for pickup!${servicesText}${cost}${invoiceText} Please do not reply to this message. Please text ${shopContact} if you need to reach me.`;
   try {
     return await sendSms(customer.phone, customer.carrier, text);
   } catch (err) {
@@ -78,7 +84,7 @@ async function sendJobStartSms(customer, estimatedCompletion, customerCost, serv
 
 
 // ─── Build invoice HTML (shared by email + print) ────────────────────────────
-function buildInvoiceHtml(customer, { services, charge_other, customer_cost, estimated_completion, notes, bike_name, job_date }, { forPrint = false } = {}) {
+function buildInvoiceHtml(customer, { services, charge_other, customer_cost, estimated_completion, notes, bike_name, job_date }, { forPrint = false, intro = false } = {}) {
   const d = job_date ? new Date(job_date + 'T12:00:00') : new Date();
   const dateFormatted = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
 
@@ -109,6 +115,8 @@ function buildInvoiceHtml(customer, { services, charge_other, customer_cost, est
 
   ${printBtn}
 
+  ${intro ? `<p style="text-align:center;font-size:1.05rem;margin:0 0 18px;">Your bike is finished and ready for pickup! Your invoice is below.</p>` : ''}
+
   <h1 style="text-align:center;font-size:2rem;font-weight:bold;margin:0 0 4px;">Invoice</h1>
   <p style="text-align:center;font-weight:bold;margin:0 0 16px;">B-Rad and ride a bike</p>
 
@@ -129,12 +137,12 @@ function buildInvoiceHtml(customer, { services, charge_other, customer_cost, est
     </tr>
     <tr>
       <td style="${cellStyle}border-right:${border};">Phone</td>
-      <td style="${cellStyle}border-right:${border};width:36%;">${customer.phone || ''}</td>
+      <td style="${cellStyle}border-right:${border};width:36%;">${escapeHtml(formatPhone(customer.phone || ''))}</td>
       <td style="${cellStyle}"><strong>Bike Make/Model</strong><br>${escapeHtml(bike_name || '')}</td>
     </tr>
     <tr>
       <td style="padding:6px 10px;border-right:${border};">Email</td>
-      <td colspan="2" style="padding:6px 10px;">${customer.email || ''}</td>
+      <td colspan="2" style="padding:6px 10px;">${escapeHtml(customer.email || '')}</td>
     </tr>
   </table>
 
@@ -175,9 +183,9 @@ async function sendInvoiceEmail(customer, jobData) {
   if (!customer.email) return { skipped: true, reason: 'No email on file' };
   const t = makeTransporter();
   if (!t) return { skipped: true, reason: 'Gmail not configured' };
-  const html = buildInvoiceHtml(customer, jobData);
+  const html = buildInvoiceHtml(customer, jobData, { intro: true });
   try {
-    await t.transporter.sendMail({ from: t.from, to: customer.email, subject: 'B-Rads Bikes — Service Invoice', html });
+    await t.transporter.sendMail({ from: t.from, to: customer.email, subject: 'Your bike is ready — B-Rads Bikes Invoice', html });
     return { sent: true };
   } catch (err) {
     console.error('Invoice email failed:', err.message);
@@ -201,10 +209,14 @@ router.post('/', async (req, res) => {
       reminders,
       job_date,
       is_past_job,
+      tip,
     } = req.body;
 
     if (!customer_id) {
       return res.status(400).json({ error: 'Customer is required' });
+    }
+    if (job_date && !/^\d{4}-\d{2}-\d{2}$/.test(job_date)) {
+      return res.status(400).json({ error: 'job_date must be in YYYY-MM-DD format' });
     }
 
     // Compute customer_cost server-side: services + charge_other (labor removed)
@@ -212,13 +224,15 @@ router.post('/', async (req, res) => {
     const charge_other_total = (charge_other || []).reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
     const customer_cost = services_total + charge_other_total;
 
-    const jobId = createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date });
+    // Fall back to the server's local date (the DB default is UTC, which is wrong in the evening)
+    const localToday = new Date().toLocaleDateString('en-CA');
+    const jobId = createJob({ customer_id, notes, customer_cost, estimated_completion, parts, other, services, charge_other, bike_id, job_date: job_date || localToday, tip: parseFloat(tip) || 0 });
 
     const customer = getCustomerById(parseInt(customer_id));
     const bike = bike_id ? getBikeById(parseInt(bike_id)) : null;
 
-    // Schedule follow-up reminders if opted in
-    if (reminders && reminders.length > 0 && customer) {
+    // Schedule follow-up reminders if opted in — skip for past jobs
+    if (!is_past_job && reminders && reminders.length > 0 && customer) {
       const shopContact = getShopContactText();
       for (const r of reminders) {
         if (!r.part_name || !r.follow_up_value || !r.follow_up_unit) continue;
@@ -233,8 +247,8 @@ router.post('/', async (req, res) => {
           customer_id: parseInt(customer_id),
           part_name: r.part_name,
           send_at: sendAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ''),
-          cust_message: `Hi ${customer.name}, This is a reminder from B-Rad's Bikes! It might be time for your ${r.part_name} service. Contact me if you'd like to schedule a service. (714) 235-5959\nPlease do not reply to this message.`,
-          shop_message: `B-Rads Bikes reminder: ${customer.name} (${customer.phone || 'no phone'}) has been notified that it's time for their ${r.part_name} service.`,
+          cust_message: `Hi ${customer.name}, This is a reminder from B-Rad's Bikes! It might be time for your ${r.part_name} service. Contact me if you'd like to schedule a service. ${shopContact}\nPlease do not reply to this message.`,
+          shop_message: `B-Rads Bikes reminder: ${customer.name} (${formatPhone(customer.phone) || 'no phone'}) has been notified that it's time for their ${r.part_name} service.`,
         });
       }
     }
@@ -250,11 +264,11 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Optionally send job-start SMS — skip for past jobs
+    // Optionally send job-finished SMS — skip for past jobs
     let smsResult = null;
     if (send_notification && customer && !is_past_job) {
       try {
-        smsResult = await sendJobStartSms(customer, estimated_completion, customer_cost, services);
+        smsResult = await sendJobFinishedSms(customer, customer_cost, services, invoiceResult?.sent === true);
       } catch (smsErr) {
         console.error('SMS error:', smsErr.message);
         smsResult = { skipped: true, reason: smsErr.message };
@@ -331,15 +345,18 @@ router.get('/:id/data', (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { customer_id, notes, estimated_completion, parts, other, services, charge_other, bike_id } = req.body;
+    const { customer_id, notes, parts, other, services, charge_other, bike_id, tip, job_date } = req.body;
 
     if (!customer_id) return res.status(400).json({ error: 'Customer is required' });
+    if (job_date && !/^\d{4}-\d{2}-\d{2}$/.test(job_date)) {
+      return res.status(400).json({ error: 'job_date must be in YYYY-MM-DD format' });
+    }
 
     const services_total     = (services || []).reduce((s, sv) => s + (parseFloat(sv.price) || 0), 0);
     const charge_other_total = (charge_other || []).reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
     const customer_cost = services_total + charge_other_total;
 
-    updateJob(id, { customer_id, notes, customer_cost, estimated_completion, parts: parts || [], other: other || [], services: services || [], charge_other: charge_other || [], bike_id });
+    updateJob(id, { customer_id, notes, customer_cost, parts: parts || [], other: other || [], services: services || [], charge_other: charge_other || [], bike_id, tip: parseFloat(tip) || 0, job_date });
     res.json({ id });
   } catch (err) {
     console.error(err);

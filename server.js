@@ -38,17 +38,16 @@ app.use('/api/settings',  settingsRoutes);
 app.use('/api/parts',     partsRoutes);
 app.use('/api/bikes',     bikesRoutes);
 
+// Require login for HTML pages (login page excepted); CSS/JS stay public
+app.use((req, res, next) => {
+  const isPage = req.path === '/' || req.path.endsWith('.html');
+  if (!isPage || req.path === '/login.html') return next();
+  if (req.session && req.session.authenticated) return next();
+  res.redirect('/login');
+});
+
 // Serve static files (HTML, CSS, JS)
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Root redirect
-app.get('/', (req, res) => {
-  if (req.session && req.session.authenticated) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  } else {
-    res.redirect('/login');
-  }
-});
 
 // ─── Follow-up Reminder Scheduler ────────────────────────────────────────────
 function startReminderScheduler() {

@@ -4,6 +4,15 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   window.location.href = '/login';
 });
 
+// ─── Local date helper (avoids UTC-midnight off-by-one) ──────────────────────
+function todayLocalStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 // ─── HTML escape helper ───────────────────────────────────────────────────────
 function escapeHtml(str) {
   return String(str || '')
@@ -93,12 +102,12 @@ function selectCustomer(id, name) {
   customerDropdown.classList.remove('open');
   document.getElementById('edit-customer-btn').style.display = '';
   const notifLabel = document.querySelector('#send-notification + span');
-  if (notifLabel) notifLabel.textContent = `Send ${name} a text message that their job has started`;
+  if (notifLabel) notifLabel.textContent = `Send ${name} a text message that their job is finished`;
   // Pre-fill edit form
   const c = allCustomers.find(c => c.id === id);
   if (c) {
     document.getElementById('ec-name').value    = c.name || '';
-    document.getElementById('ec-phone').value   = c.phone || '';
+    document.getElementById('ec-phone').value   = formatPhone(c.phone || '');
     document.getElementById('ec-email').value   = c.email || '';
     document.getElementById('ec-carrier').value = c.carrier || '';
   }
@@ -499,16 +508,31 @@ function sumList(containerId) {
 function fmt(n) { return '$' + n.toFixed(2); }
 
 function recalculate() {
-  const parts = sumList('parts-list');
+  const parts    = sumList('parts-list');
   const services = sumList('services-list');
+  const tip      = parseFloat(document.getElementById('tip-input').value) || 0;
 
-  const expenses = parts;
-  const customer_cost = services;
-  const profit        = customer_cost - expenses;
+  // In edit mode, include "other" rows the form doesn't display —
+  // the server counts them, so the totals shown must match what gets saved
+  const otherExpenses = editJobOther.reduce((s, o) => s + (parseFloat(o.price) || 0), 0);
+  const otherCharges  = editJobChargeOther.reduce((s, co) => s + (parseFloat(co.price) || 0), 0);
+
+  const expenses      = parts + otherExpenses;
+  const customer_cost = services + otherCharges;
+  const profit        = customer_cost + tip - expenses;
 
   document.getElementById('total-expenses').textContent = fmt(expenses);
   document.getElementById('services-total').textContent = fmt(services);
   document.getElementById('customer-cost-display').textContent = fmt(customer_cost);
+
+  const tipBox = document.getElementById('tip-display-box');
+  if (tip > 0) {
+    document.getElementById('tip-display').textContent = fmt(tip);
+    tipBox.style.display = '';
+  } else {
+    tipBox.style.display = 'none';
+  }
+
   document.getElementById('profit-amount').textContent = fmt(profit);
 
   const profitBox = document.getElementById('profit-box');
@@ -517,6 +541,12 @@ function recalculate() {
   if (profit > 0) profitBox.classList.add('profit-positive');
   else if (profit < 0) profitBox.classList.add('profit-negative');
 }
+
+document.getElementById('tip-input').addEventListener('input', recalculate);
+
+// ─── Phone input masks ────────────────────────────────────────────────────────
+attachPhoneMask(document.getElementById('new-customer-phone'));
+attachPhoneMask(document.getElementById('ec-phone'));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COLLECT & SAVE
@@ -552,7 +582,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const services = collectSimpleRows('services-list', 'price');
   const charge_other = [];
   const notes = document.getElementById('job-notes').value.trim();
-  const estimatedCompletion = document.getElementById('estimated-completion').value.trim();
+  const dateCompleted = document.getElementById('estimated-completion').value.trim();
   const bike_id             = bikeIdInput.value ? parseInt(bikeIdInput.value) : null;
 
   const saveBtn = document.getElementById('save-btn');
@@ -562,18 +592,21 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   try {
     let res;
     if (editJobId) {
+      const tip = parseFloat(document.getElementById('tip-input').value) || 0;
       res = await fetch(`/api/jobs/${editJobId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other: editJobOther, services, charge_other: editJobChargeOther, bike_id }),
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, job_date: dateCompleted || undefined, parts, other: editJobOther, services, charge_other: editJobChargeOther, bike_id, tip }),
       });
     } else {
       const sendNotification = document.getElementById('send-notification').checked;
       const reminders        = getScheduledReminders();
+      const job_date         = dateCompleted || todayLocalStr();
+      const tip              = parseFloat(document.getElementById('tip-input').value) || 0;
       res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: parseInt(customerId), notes, estimated_completion: estimatedCompletion, parts, other, services, charge_other, bike_id, send_notification: sendNotification, reminders }),
+        body: JSON.stringify({ customer_id: parseInt(customerId), notes, parts, other, services, charge_other, bike_id, send_notification: sendNotification, reminders, job_date, is_past_job: isPastMode, tip }),
       });
     }
 
@@ -677,9 +710,14 @@ async function prefillEditMode(jobId) {
     if (bike) selectBike(bike.id, bike.name);
   }
 
-  // Completion date
-  if (job.estimated_completion) {
-    document.getElementById('estimated-completion').value = job.estimated_completion;
+  // Date completed = the job's date (editing it corrects the job's date)
+  if (job.date) {
+    document.getElementById('estimated-completion').value = job.date;
+  }
+
+  // Tip
+  if (job.tip) {
+    document.getElementById('tip-input').value = Number(job.tip).toFixed(2);
   }
 
   // Notes
@@ -730,11 +768,23 @@ async function prefillEditMode(jobId) {
 const urlParams = new URLSearchParams(window.location.search);
 const editParam = urlParams.get('edit');
 if (editParam) editJobId = parseInt(editParam);
+const isPastMode = urlParams.get('past') === 'true' && !editJobId;
+
+if (isPastMode) {
+  document.title = 'Log a Past Job — B-Rads Bikes';
+  document.getElementById('notifications-card').style.display = 'none';
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:#EDF0F5;border:1px solid #C8D0DC;border-radius:6px;padding:10px 14px;font-size:0.88rem;color:#333;margin-bottom:16px;';
+  banner.textContent = 'Logging a past job: set Date Completed to the day the job was done. Past jobs are saved without sending any texts, invoices, or reminders.';
+  const container = document.querySelector('.container');
+  container.insertBefore(banner, document.getElementById('error-msg'));
+}
 
 Promise.all([loadAllCustomers(), loadAllParts(), loadAllBikes()]).then(() => {
   if (editJobId) {
     prefillEditMode(editJobId);
   } else {
+    document.getElementById('estimated-completion').value = todayLocalStr();
     createPartRow(document.getElementById('parts-list'));
     createSimpleRow(document.getElementById('services-list'), 'Service description');
   }

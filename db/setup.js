@@ -133,6 +133,7 @@ async function initDb() {
     "ALTER TABLE jobs ADD COLUMN estimated_completion TEXT NOT NULL DEFAULT ''",
     "ALTER TABLE jobs ADD COLUMN bike_id INTEGER",
     "ALTER TABLE job_parts ADD COLUMN part_id INTEGER",
+    "ALTER TABLE jobs ADD COLUMN tip REAL NOT NULL DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (_) { /* column already exists */ }

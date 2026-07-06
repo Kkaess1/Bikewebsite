@@ -38,7 +38,7 @@ function renderList(customers) {
   el.innerHTML = customers.map(c => `
     <div class="customer-list-row" data-id="${c.id}">
       <div class="customer-list-name">${escapeHtml(c.name)}</div>
-      <div class="customer-list-contact">${escapeHtml(c.phone || '')}${c.phone && c.email ? ' &bull; ' : ''}${escapeHtml(c.email || '')}</div>
+      <div class="customer-list-contact">${escapeHtml(formatPhone(c.phone || ''))}${c.phone && c.email ? ' &bull; ' : ''}${escapeHtml(c.email || '')}</div>
     </div>
   `).join('');
 
@@ -82,13 +82,13 @@ const CARRIER_LABELS = {
 
 function renderDetail(customer) {
   document.getElementById('detail-name').textContent = customer.name;
-  document.getElementById('detail-phone').textContent = customer.phone || '—';
+  document.getElementById('detail-phone').textContent = formatPhone(customer.phone) || '—';
   document.getElementById('detail-email').textContent = customer.email || '—';
   document.getElementById('detail-carrier').textContent = CARRIER_LABELS[customer.carrier] || '—';
 
   // Pre-fill edit form
   document.getElementById('edit-name').value = customer.name;
-  document.getElementById('edit-phone').value = customer.phone || '';
+  document.getElementById('edit-phone').value = formatPhone(customer.phone || '');
   document.getElementById('edit-email').value = customer.email || '';
   document.getElementById('edit-carrier').value = customer.carrier || '';
 
@@ -159,6 +159,7 @@ function renderDetail(customer) {
         <div class="job-detail" id="${amountsId}">
           <span class="job-history-amounts">
             Charged: <strong>$${job.customer_cost.toFixed(2)}</strong>
+            ${job.tip > 0 ? `&nbsp;&nbsp;Tip: <strong style="color:#1a7a1a;">$${job.tip.toFixed(2)}</strong>` : ''}
             &nbsp;&nbsp;Profit: <strong class="${profitClass}">$${job.profit.toFixed(2)}</strong>
           </span>
         </div>
@@ -240,7 +241,7 @@ document.getElementById('save-contact-btn').addEventListener('click', async () =
 
     // Reload detail
     document.getElementById('detail-name').textContent = name;
-    document.getElementById('detail-phone').textContent = phone || '—';
+    document.getElementById('detail-phone').textContent = formatPhone(phone) || '—';
     document.getElementById('detail-email').textContent = email || '—';
     document.getElementById('detail-carrier').textContent = CARRIER_LABELS[carrier] || '—';
     document.getElementById('contact-edit').style.display = 'none';
@@ -322,4 +323,5 @@ async function resendInvoice(jobId, btn) {
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
+attachPhoneMask(document.getElementById('edit-phone'));
 loadCustomers();

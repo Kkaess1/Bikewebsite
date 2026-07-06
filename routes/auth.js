@@ -23,16 +23,28 @@ router.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
 });
 
+// Brute-force protection: 5 failed attempts locks login for 15 minutes per IP
+const failedAttempts = new Map();
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+
 // Handle login form submission
 router.post('/api/login', (req, res) => {
+  const rec = failedAttempts.get(req.ip);
+  if (rec && rec.count >= MAX_ATTEMPTS && Date.now() - rec.last < LOCKOUT_MS) {
+    return res.status(429).json({ error: 'Too many failed attempts. Try again in 15 minutes.' });
+  }
   const { password } = req.body;
   if (!password) {
     return res.status(400).json({ error: 'Password required' });
   }
   if (bcrypt.compareSync(password, getPasswordHash())) {
+    failedAttempts.delete(req.ip);
     req.session.authenticated = true;
     return res.json({ success: true });
   }
+  const count = (rec && Date.now() - rec.last < LOCKOUT_MS) ? rec.count + 1 : 1;
+  failedAttempts.set(req.ip, { count, last: Date.now() });
   res.status(401).json({ error: 'Incorrect password' });
 });
 
