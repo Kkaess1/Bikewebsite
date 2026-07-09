@@ -121,6 +121,20 @@
     </div>
   </div>
 
+  <!-- Delete job confirmation modal -->
+  <div id="job-delete-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:none;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;padding:28px 24px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <h3 style="margin:0 0 10px;font-size:1.1rem;color:#c00;">Delete Job?</h3>
+      <p style="font-size:0.9rem;color:#444;margin:0 0 6px;">You are about to permanently delete the job from:</p>
+      <p style="font-weight:700;font-size:1rem;margin:0 0 12px;" id="modal-job-date"></p>
+      <p style="font-size:0.88rem;color:#888;margin:0 0 20px;">Its charges, parts, and any pending reminders will be removed, and it will no longer appear in reports. <strong>This cannot be undone.</strong></p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn" id="confirm-job-delete-btn" style="background:#c00;color:#fff;flex:1;">Yes, Delete Job</button>
+        <button class="btn btn-secondary" id="cancel-job-delete-btn" style="flex:1;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/auth-guard.js"></script>
   <script src="/js/phone-format.js"></script>
   <script src="/js/customers.js"></script>

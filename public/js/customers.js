@@ -152,6 +152,7 @@ function renderDetail(customer) {
             <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="window.location.href='/job.html?edit=${job.id}'">Edit</button>
             <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="printInvoice(${job.id})">Print</button>
             <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;" onclick="resendInvoice(${job.id}, this)">Resend</button>
+            <button class="btn btn-secondary" style="font-size:0.75rem;padding:3px 10px;color:#c00;border-color:#c00;" onclick="deleteJobPrompt(${job.id}, '${job.date}')">Delete</button>
             <span class="detail-toggle" onclick="toggleAmounts('${amountsId}')">&#9660; amounts</span>
             ${hasDetail ? `<span class="detail-toggle" onclick="toggleJobDetail('${detailId}')">&#9660; details</span>` : ''}
           </span>
@@ -292,6 +293,49 @@ document.getElementById('confirm-delete-btn').addEventListener('click', async ()
   } finally {
     btn.disabled = false;
     btn.textContent = 'Yes, Delete Everything';
+  }
+});
+
+// ─── Delete Job ───────────────────────────────────────────────────────────────
+const jobDeleteModal = document.getElementById('job-delete-modal');
+let pendingDeleteJobId = null;
+
+function deleteJobPrompt(jobId, jobDate) {
+  pendingDeleteJobId = jobId;
+  document.getElementById('modal-job-date').textContent = jobDate;
+  jobDeleteModal.style.display = 'flex';
+}
+
+function closeJobDeleteModal() {
+  jobDeleteModal.style.display = 'none';
+  pendingDeleteJobId = null;
+}
+
+document.getElementById('cancel-job-delete-btn').addEventListener('click', closeJobDeleteModal);
+jobDeleteModal.addEventListener('click', (e) => {
+  if (e.target === jobDeleteModal) closeJobDeleteModal();
+});
+
+document.getElementById('confirm-job-delete-btn').addEventListener('click', async () => {
+  if (!pendingDeleteJobId) return;
+  const btn = document.getElementById('confirm-job-delete-btn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting...';
+  try {
+    const res = await fetch(`/api/jobs/${pendingDeleteJobId}`, { method: 'DELETE' });
+    if (res.ok) {
+      closeJobDeleteModal();
+      // Refresh the detail panel so history and summary totals update
+      if (currentCustomerId) openCustomer(currentCustomerId);
+    } else {
+      const d = await res.json();
+      alert(d.error || 'Failed to delete job.');
+    }
+  } catch {
+    alert('Connection error. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Yes, Delete Job';
   }
 });
 

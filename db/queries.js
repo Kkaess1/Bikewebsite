@@ -281,6 +281,24 @@ function updateJob(id, { customer_id, notes, customer_cost, parts, other, servic
   }
 }
 
+function deleteJob(id) {
+  const db = getDb();
+  db.run('BEGIN TRANSACTION');
+  try {
+    db.run('DELETE FROM job_parts WHERE job_id = ?', [id]);
+    db.run('DELETE FROM job_other WHERE job_id = ?', [id]);
+    db.run('DELETE FROM job_services WHERE job_id = ?', [id]);
+    db.run('DELETE FROM job_charge_other WHERE job_id = ?', [id]);
+    db.run('DELETE FROM job_reminders WHERE job_id = ?', [id]);
+    db.run('DELETE FROM jobs WHERE id = ?', [id]);
+    db.run('COMMIT');
+    saveDb();
+  } catch (err) {
+    db.run('ROLLBACK');
+    throw err;
+  }
+}
+
 // ─── Parts Catalog ────────────────────────────────────────────────────────────
 
 function getAllParts() {
@@ -476,6 +494,7 @@ module.exports = {
   createJob,
   getJobById,
   updateJob,
+  deleteJob,
   getAllParts,
   getPartById,
   createPart,

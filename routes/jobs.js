@@ -1,7 +1,7 @@
 const express = require('express');
 const nodemailer = require('nodemailer');
 const requireAuth = require('../middleware/requireAuth');
-const { createJob, getJobById, updateJob, getCustomerById, getBikeById, createReminder, getSetting } = require('../db/queries');
+const { createJob, getJobById, updateJob, deleteJob, getCustomerById, getBikeById, createReminder, getSetting } = require('../db/queries');
 const router = express.Router();
 
 router.use(requireAuth);
@@ -384,6 +384,20 @@ router.put('/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to update job' });
+  }
+});
+
+// ─── DELETE /api/jobs/:id — permanently remove a job ─────────────────────────
+router.delete('/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const job = getJobById(id);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    deleteJob(id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete job' });
   }
 });
 
