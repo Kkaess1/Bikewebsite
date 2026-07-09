@@ -8,8 +8,10 @@
   <style>
     #print-header { display: none; }
     @media print {
+      html, body { min-height: 0 !important; height: auto !important; background: #fff !important; }
+      .container { margin: 0 auto !important; }
       header, .filter-bar, .custom-range, .quarterly-select, #error-msg,
-      #filter-card, #chart-card, #back-link, #print-btn, #parts-search { display: none !important; }
+      #filter-card, #chart-card, #back-link, #print-btn, #parts-card { display: none !important; }
       #print-header { display: block; margin-bottom: 24px; }
       #print-header h1 { font-size: 1.4rem; margin: 0 0 4px; }
       #print-header p { margin: 2px 0; font-size: 0.9rem; color: #444; }
