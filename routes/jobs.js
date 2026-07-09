@@ -6,13 +6,22 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-// ─── Phone display formatting: 10-digit numbers become xxx-xxx-xxxx ──────────
+// ─── Phone helpers (US numbers only) ──────────────────────────────────────────
+// Display: (+1) xxx-xxx-xxxx. Sending: bare 10 digits (gateways require this).
+
 function formatPhone(str) {
   const s = String(str || '').trim();
   let digits = s.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
   if (digits.length !== 10) return s;
-  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `(+1) ${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// Returns the bare 10-digit US number, or null if it isn't one
+function usPhoneDigits(str) {
+  let digits = String(str || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  return digits.length === 10 ? digits : null;
 }
 
 // ─── HTML escape helper ───────────────────────────────────────────────────────
@@ -54,15 +63,15 @@ async function sendSms(phone, carrier, text) {
   if (!phone) return { skipped: true, reason: 'No phone number on file' };
   const gateway = GATEWAYS[carrier];
   if (!gateway) return { skipped: true, reason: 'No carrier on file — cannot determine SMS gateway' };
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 10) return { skipped: true, reason: 'Phone number too short' };
+  const digits = usPhoneDigits(phone);
+  if (!digits) return { skipped: true, reason: 'Not a valid 10-digit US phone number' };
   await t.transporter.sendMail({ from: t.from, to: `${digits}@${gateway}`, subject: 'B-Rads Bikes', text });
   return { sent: true };
 }
 
 function getShopContactText() {
   const configured = formatPhone((getSetting('shop_phone') || '').trim());
-  return configured || '714-235-5959';
+  return configured || '(+1) 714-235-5959';
 }
 
 // ─── Send job-finished SMS ────────────────────────────────────────────────────
@@ -86,22 +95,26 @@ async function sendJobFinishedSms(customer, customerCost, services, invoiceWasEm
 // ─── Build invoice HTML (shared by email + print) ────────────────────────────
 function buildInvoiceHtml(customer, { services, charge_other, customer_cost, estimated_completion, notes, bike_name, job_date }, { forPrint = false, intro = false } = {}) {
   const d = job_date ? new Date(job_date + 'T12:00:00') : new Date();
-  const dateFormatted = `${d.getMonth() + 1}/${d.getDate()}/${String(d.getFullYear()).slice(-2)}`;
+  const dateFormatted = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   const completionFormatted = estimated_completion
     ? new Date(estimated_completion + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
     : null;
 
-  const border = '1px solid #000';
-  const cellStyle = `padding:6px 10px;border-bottom:${border};`;
   // Parts (shop expenses) are intentionally excluded from the customer-facing invoice
   const allItems = [
     ...(services     || []).filter(s => s.description?.trim()).map(s => ({ desc: s.description, price: s.price })),
     ...(charge_other || []).filter(o => o.description?.trim()).map(o => ({ desc: o.description, price: o.price })),
   ];
-  const allItemsHtml = allItems.map(item =>
-    `<tr><td style="${cellStyle}">${escapeHtml(item.desc)}</td><td style="${cellStyle}width:90px;">$${Number(item.price).toFixed(2)}</td></tr>`
-  ).join('');
+
+  const labelStyle = `color:#8A97A5;font-size:11px;letter-spacing:1.5px;font-weight:bold;`;
+  const itemCell = `padding:12px 0;font-size:14px;border-bottom:1px solid #E5E9EE;`;
+
+  const itemRows = allItems.map(item => `
+              <tr>
+                <td style="${itemCell}">${escapeHtml(item.desc)}</td>
+                <td style="${itemCell}" align="right">$${Number(item.price).toFixed(2)}</td>
+              </tr>`).join('');
 
   const printBtn = forPrint ? `
   <div style="text-align:center;margin-bottom:20px;">
@@ -111,70 +124,80 @@ function buildInvoiceHtml(customer, { services, charge_other, customer_cost, est
   const printStyle = forPrint ? `<style>@media print { button { display:none !important; } }</style>` : '';
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">${printStyle}</head>
-<body style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto;padding:20px;color:#333;background:#fff;">
+<body style="font-family:Arial,Helvetica,sans-serif;color:#333333;background:#ffffff;margin:0;padding:24px 10px;">
 
   ${printBtn}
 
-  ${intro ? `<p style="text-align:center;font-size:1.05rem;margin:0 0 18px;">Your bike is finished and ready for pickup! Your invoice is below.</p>` : ''}
+  ${intro ? `<p style="text-align:center;font-size:15px;margin:0 auto 18px;max-width:650px;">Your bike is finished and ready for pickup! Your invoice is below.</p>` : ''}
 
-  <h1 style="text-align:center;font-size:2rem;font-weight:bold;margin:0 0 4px;">Invoice</h1>
-  <p style="text-align:center;font-weight:bold;margin:0 0 16px;">B-Rad and ride a bike</p>
-
-  <table style="width:100%;border-collapse:collapse;border:${border};">
+  <table role="presentation" width="650" cellpadding="0" cellspacing="0" align="center" style="max-width:650px;width:100%;margin:0 auto;border-collapse:collapse;border:1px solid #E5E9EE;">
     <tr>
-      <td style="padding:6px 10px;border-right:${border};width:70%;"></td>
-      <td style="padding:6px 10px;"><strong>Date Created: ${dateFormatted}</strong></td>
+      <td style="background:#002244;padding:22px 30px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td>
+            <div style="color:#FFFFFF;font-size:21px;font-weight:bold;">B-Rads Bikes</div>
+            <div style="color:#FA9B7E;font-size:12px;margin-top:2px;">B-Rad and ride a bike</div>
+          </td>
+          <td align="right">
+            <div style="color:#9FB3C8;font-size:12px;letter-spacing:3px;">INVOICE</div>
+            <div style="color:#FFFFFF;font-size:13px;margin-top:3px;">${dateFormatted}</div>
+          </td>
+        </tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 30px 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td valign="top">
+            <div style="${labelStyle}">PREPARED FOR</div>
+            <div style="font-size:15px;font-weight:bold;color:#1C2733;margin-top:4px;">${escapeHtml(customer.name || '')}</div>
+            ${customer.phone ? `<div style="font-size:13px;color:#5C6B7A;margin-top:2px;">${escapeHtml(formatPhone(customer.phone))}</div>` : ''}
+            ${customer.email ? `<div style="font-size:13px;color:#5C6B7A;">${escapeHtml(customer.email)}</div>` : ''}
+          </td>
+          <td valign="top" align="right">
+            ${bike_name ? `<div style="${labelStyle}">BIKE</div>
+            <div style="font-size:14px;color:#1C2733;margin-top:4px;">${escapeHtml(bike_name)}</div>` : ''}
+            ${completionFormatted ? `<div style="${labelStyle}margin-top:${bike_name ? '10px' : '0'};">COMPLETED</div>
+            <div style="font-size:13px;color:#1C2733;margin-top:3px;">${completionFormatted}</div>` : ''}
+          </td>
+        </tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:18px 30px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          <tr>
+            <td style="padding:0 0 8px;${labelStyle}border-bottom:2px solid #002244;">WORK PERFORMED</td>
+            <td style="padding:0 0 8px;border-bottom:2px solid #002244;" align="right"></td>
+          </tr>
+          ${itemRows || `<tr><td style="${itemCell}color:#8A97A5;" colspan="2">No itemized charges</td></tr>`}
+          <tr>
+            <td style="padding:16px 0 0;" align="right"></td>
+            <td style="padding:16px 0 0;" align="right">
+              <div style="${labelStyle}">TOTAL</div>
+              <div style="color:#002244;font-size:26px;font-weight:bold;margin-top:2px;">$${Number(customer_cost).toFixed(2)}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    ${notes ? `<tr>
+      <td style="padding:20px 30px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td style="background:#F4F6F8;border-left:3px solid #FA4616;padding:12px 16px;font-size:13px;color:#44515F;">
+            <span style="font-weight:bold;color:#1C2733;">Observations:</span>
+            ${escapeHtml(notes)}
+          </td>
+        </tr></table>
+      </td>
+    </tr>` : ''}
+    <tr>
+      <td style="padding:26px 30px 28px;" align="center">
+        <div style="font-family:Georgia,serif;font-style:italic;font-size:13px;color:#5C6B7A;">&ldquo;I treat your bike like it&rsquo;s mine until you come pick it up&rdquo;</div>
+        <div style="font-size:12px;color:#8A97A5;margin-top:8px;">Questions? Text ${getShopContactText()}</div>
+      </td>
     </tr>
   </table>
-
-  <table style="width:100%;border-collapse:collapse;border:${border};border-top:none;">
-    <tr>
-      <td colspan="3" style="text-align:center;font-weight:bold;font-size:1rem;padding:8px;border-bottom:${border};">Customer Info</td>
-    </tr>
-    <tr>
-      <td style="${cellStyle}border-right:${border};width:14%;">Name</td>
-      <td colspan="2" style="${cellStyle}">${escapeHtml(customer.name || '')}</td>
-    </tr>
-    <tr>
-      <td style="${cellStyle}border-right:${border};">Phone</td>
-      <td style="${cellStyle}border-right:${border};width:36%;">${escapeHtml(formatPhone(customer.phone || ''))}</td>
-      <td style="${cellStyle}"><strong>Bike Make/Model</strong><br>${escapeHtml(bike_name || '')}</td>
-    </tr>
-    <tr>
-      <td style="padding:6px 10px;border-right:${border};">Email</td>
-      <td colspan="2" style="padding:6px 10px;">${escapeHtml(customer.email || '')}</td>
-    </tr>
-  </table>
-
-  <table style="width:100%;border-collapse:collapse;border:${border};border-top:none;">
-    <tr>
-      <td colspan="2" style="text-align:center;font-weight:bold;font-size:1rem;padding:8px;border-bottom:${border};">Work Performed</td>
-    </tr>
-    ${allItemsHtml}
-    <tr>
-      <td style="padding:8px 10px;border-top:2px solid #000;text-align:right;font-weight:bold;">Grand Total</td>
-      <td style="padding:8px 10px;border-top:2px solid #000;font-weight:bold;width:90px;">$${Number(customer_cost).toFixed(2)}</td>
-    </tr>
-  </table>
-
-  ${completionFormatted ? `
-  <table style="width:100%;border-collapse:collapse;border:${border};border-top:none;">
-    <tr>
-      <td style="padding:8px 10px;">Completion Date: <strong>${completionFormatted}</strong></td>
-    </tr>
-  </table>` : ''}
-
-  ${notes ? `
-  <table style="width:100%;border-collapse:collapse;border:${border};border-top:none;">
-    <tr>
-      <td style="text-align:center;font-weight:bold;font-size:1rem;padding:8px;border-bottom:${border};">Observations of Bike</td>
-    </tr>
-    <tr>
-      <td style="padding:8px 10px;">${escapeHtml(notes)}</td>
-    </tr>
-  </table>` : ''}
-
-  <p style="text-align:center;font-style:italic;margin-top:24px;">&ldquo;I treat your bike like it&rsquo;s mine until you come pick it up&rdquo;</p>
 </body></html>`;
 }
 

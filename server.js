@@ -64,8 +64,10 @@ function startReminderScheduler() {
     if (!phone || !carrier) return;
     const gateway = GATEWAYS[carrier];
     if (!gateway) return;
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length < 10) return;
+    // US numbers only: gateways need the bare 10 digits (any +1 prefix stripped)
+    let digits = String(phone).replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+    if (digits.length !== 10) return;
     await transporter.sendMail({ from, to: `${digits}@${gateway}`, subject: 'B-Rads Bikes', text });
   }
 

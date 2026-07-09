@@ -445,6 +445,7 @@ td.num, th.num { text-align: right; }
 .chart-toggle.active[data-metric="revenue"]  { border-color: #002244; color: #002244; background: #EDF0F5; }
 .chart-toggle.active[data-metric="expenses"] { border-color: #FA4616; color: #FA4616; background: #FFF8F6; }
 .chart-toggle.active[data-metric="profit"]   { border-color: #1a7a1a; color: #1a7a1a; background: #f0f8f0; }
+.chart-toggle.active[data-metric="tips"]     { border-color: #c79a00; color: #c79a00; background: #FFF9E6; }
 .chart-toggle.active[data-metric="jobs"]     { border-color: #6B4E9A; color: #6B4E9A; background: #F5F0FF; }
 
 /* ─── Checkbox ─────────────────────────────────────────────────────────────── */

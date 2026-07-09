@@ -76,7 +76,12 @@ router.post('/gmail/test', async (req, res) => {
     return res.status(400).json({ error: 'Please enter a phone number and select a carrier for the test' });
   }
 
-  const digits = test_phone.replace(/\D/g, '');
+  // US numbers only: gateways need the bare 10 digits (any +1 prefix stripped)
+  let digits = test_phone.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  if (digits.length !== 10) {
+    return res.status(400).json({ error: 'Please enter a valid 10-digit US phone number' });
+  }
   const to = `${digits}@${GATEWAYS[test_carrier]}`;
 
   try {
