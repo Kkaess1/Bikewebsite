@@ -308,7 +308,55 @@ document.querySelectorAll('.chart-toggle').forEach(btn => {
 // ─── Render ───────────────────────────────────────────────────────────────────
 function fmt(n) { return '$' + Number(n).toFixed(2); }
 
-function renderReport({ jobs, summary }, from, to) {
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+let lastPartsUsage = [];
+
+function renderPartsUsage(partsUsage) {
+  lastPartsUsage = partsUsage || [];
+  const card = document.getElementById('parts-card');
+  if (lastPartsUsage.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+  renderPartsRows();
+}
+
+// Renders the table body honoring the search box; totals reflect visible rows
+function renderPartsRows() {
+  const q = document.getElementById('parts-search').value.trim().toLowerCase();
+  const filtered = q ? lastPartsUsage.filter(p => p.part_name.toLowerCase().includes(q)) : lastPartsUsage;
+  const body = document.getElementById('parts-table-body');
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<tr><td colspan="3" style="padding:12px 10px;color:#888;font-style:italic;">No parts match "${escapeHtml(q)}"</td></tr>`;
+    document.getElementById('parts-count-total').textContent = 0;
+    document.getElementById('parts-spent-total').textContent = fmt(0);
+    return;
+  }
+
+  body.innerHTML = filtered.map(p => `
+    <tr style="border-bottom:1px solid #E8EBF0;">
+      <td style="padding:8px 10px;">${escapeHtml(p.part_name)}</td>
+      <td style="padding:8px 10px;text-align:right;">${p.times_used}</td>
+      <td style="padding:8px 10px;text-align:right;">${fmt(p.total_spent || 0)}</td>
+    </tr>
+  `).join('');
+  document.getElementById('parts-count-total').textContent = filtered.reduce((s, p) => s + p.times_used, 0);
+  document.getElementById('parts-spent-total').textContent = fmt(filtered.reduce((s, p) => s + (p.total_spent || 0), 0));
+}
+
+document.getElementById('parts-search').addEventListener('input', renderPartsRows);
+
+function renderReport({ jobs, summary, parts_usage }, from, to) {
   document.getElementById('summary-card').style.display = '';
 
   // Summary boxes
@@ -338,6 +386,9 @@ function renderReport({ jobs, summary }, from, to) {
       <div class="amount" style="color:#4caf50;">${fmt(summary.total_profit)}</div>
     </div>
   `;
+
+  // Parts usage list
+  renderPartsUsage(parts_usage);
 
   // Chart
   renderChart(jobs, from, to);

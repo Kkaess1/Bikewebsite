@@ -443,13 +443,13 @@ function getReport(from, to) {
     });
   }
 
-  // Parts usage stats for the period
+  // Parts usage stats for the period ("Chain" and "chain" count as the same part)
   const partsUsage = all(
-    `SELECT jp.description AS part_name, COUNT(*) AS times_used, SUM(jp.price) AS total_spent
+    `SELECT TRIM(jp.description) AS part_name, COUNT(*) AS times_used, SUM(jp.price) AS total_spent
      FROM job_parts jp
      JOIN jobs j ON j.id = jp.job_id
-     WHERE j.date >= ? AND j.date <= ? AND jp.description != ''
-     GROUP BY jp.description
+     WHERE j.date >= ? AND j.date <= ? AND TRIM(jp.description) != ''
+     GROUP BY TRIM(jp.description) COLLATE NOCASE
      ORDER BY times_used DESC, total_spent DESC`,
     [from, to]
   );

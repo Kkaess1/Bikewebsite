@@ -7,14 +7,14 @@ const router = express.Router();
 router.use(requireAuth);
 
 // ─── Phone helpers (US numbers only) ──────────────────────────────────────────
-// Display: (+1) xxx-xxx-xxxx. Sending: bare 10 digits (gateways require this).
+// Display: xxx-xxx-xxxx. Sending: bare 10 digits (gateways require this).
 
 function formatPhone(str) {
   const s = String(str || '').trim();
   let digits = s.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
   if (digits.length !== 10) return s;
-  return `(+1) ${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 // Returns the bare 10-digit US number, or null if it isn't one
@@ -71,7 +71,7 @@ async function sendSms(phone, carrier, text) {
 
 function getShopContactText() {
   const configured = formatPhone((getSetting('shop_phone') || '').trim());
-  return configured || '(+1) 714-235-5959';
+  return configured || '714-235-5959';
 }
 
 // ─── Send job-finished SMS ────────────────────────────────────────────────────

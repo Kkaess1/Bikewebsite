@@ -9,7 +9,7 @@
     #print-header { display: none; }
     @media print {
       header, .filter-bar, .custom-range, .quarterly-select, #error-msg,
-      #filter-card, #chart-card, #back-link, #print-btn { display: none !important; }
+      #filter-card, #chart-card, #back-link, #print-btn, #parts-search { display: none !important; }
       #print-header { display: block; margin-bottom: 24px; }
       #print-header h1 { font-size: 1.4rem; margin: 0 0 4px; }
       #print-header p { margin: 2px 0; font-size: 0.9rem; color: #444; }
@@ -107,6 +107,33 @@
       </div>
       <div style="position:relative;height:280px;">
         <canvas id="report-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Parts Used -->
+    <div class="card" id="parts-card" style="display:none;">
+      <h2>Parts Used</h2>
+      <div class="form-group">
+        <input type="text" id="parts-search" placeholder="Search for a part..." autocomplete="off">
+      </div>
+      <div style="overflow-x:auto;">
+        <table id="parts-table" style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+          <thead>
+            <tr style="text-align:left;border-bottom:2px solid #C8D0DC;">
+              <th style="padding:8px 10px;">Part</th>
+              <th style="padding:8px 10px;text-align:right;white-space:nowrap;">Times Used</th>
+              <th style="padding:8px 10px;text-align:right;white-space:nowrap;">Total Spent</th>
+            </tr>
+          </thead>
+          <tbody id="parts-table-body"></tbody>
+          <tfoot>
+            <tr style="border-top:2px solid #C8D0DC;font-weight:700;">
+              <td style="padding:8px 10px;">Total</td>
+              <td style="padding:8px 10px;text-align:right;" id="parts-count-total"></td>
+              <td style="padding:8px 10px;text-align:right;" id="parts-spent-total"></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     </div>
 
